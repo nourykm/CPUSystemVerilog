@@ -51,3 +51,28 @@ module register_file (
     assign data_A = registers[reg_A];
     assign data_B = registers[reg_B];   
 endmodule 
+
+//Program Counter
+// Description: Has the address in memory of the instruction that must be executed. Can be changed through an enable,
+//              and is reset to address 0 in memory (which could hold a default program for testing purposes).
+// May 26, 2026
+module program_counter (
+    input logic global_clock,
+    input logic reset, // For start of program/default running of program
+    input logic PC_write, // For when we change PC: Incrementation or branch related things
+    input logic [31:0] PC_data, // The value we write into the PC
+    output logic [31:0] PC_address // The address in memory where our instruction lies
+);
+    // The address stored
+    logic [31:0] address;
+
+    always_ff @(posedge global_clock)
+        if (reset)
+            address <= 32'b0; 
+        // If the PC write is enabled, then change the PC address stored
+        else if (PC_write)
+            address <= PC_data;
+    
+    // Connect the address to the output
+    assign PC_address = address;
+endmodule
