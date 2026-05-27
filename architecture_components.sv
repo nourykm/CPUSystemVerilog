@@ -76,3 +76,33 @@ module program_counter (
     // Connect the address to the output
     assign PC_address = address;
 endmodule
+
+// Memory 
+// Description: A piece of hardware that is primarily used for our purposes to store our program. It is word addressable 
+//              and has a size of 1024 words. We have the ability to read or write into memory given an address. Values
+//              are subject to change.
+// May 27, 2026
+module hardware_memory (
+    input logic global_clock,
+    input logic mem_read, // Enablers
+    input logic mem_write,
+    input logic [31:0] address, // Address in memory to 'access'
+    input logic [31:0] data_in, // Data to be written based on address
+    output logic [31:0] data_out // Data to be read based on address
+);
+    // Initialize memory: For simplicity, have 1024 slots and memory being word addressable
+    logic [31:0] memory [1023:0];
+    initial begin
+        foreach (memory[i])
+            memory[i] = 32'b0;
+    end
+
+    // For memory writes which must be on clock edge
+    always_ff @(posedge global_clock)
+        if (mem_write)
+            memory[address] <= data_in;
+    
+    // For memory reads which could be connected using combinational logic
+    assign data_out = mem_read ? memory[address] : 32'b0;
+endmodule
+            
