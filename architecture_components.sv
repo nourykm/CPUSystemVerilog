@@ -21,11 +21,12 @@ Components:
 Architecture:
     - 32 bit word
     - 32 registers
+    - Memory is word addressable and has 1024 slots
 
 */
 
 
-
+`define MEM_SIZE 1024
 // Register file
 // Description: Holds the 32-bit values of the 32-bit registers, and has two ports to read from two registers
 //              and the ability to change the contents of a register.
@@ -91,7 +92,7 @@ module hardware_memory (
     output logic [31:0] data_out // Data to be read based on address
 );
     // Initialize memory: For simplicity, have 1024 slots and memory being word addressable
-    logic [31:0] memory [1023:0];
+    logic [31:0] memory [MEM_SIZE - 1:0];
     initial begin
         foreach (memory[i])
             memory[i] = 32'b0;
@@ -100,9 +101,59 @@ module hardware_memory (
     // For memory writes which must be on clock edge
     always_ff @(posedge global_clock)
         if (mem_write)
+            // Make sure that we are accessing within the allocated space
+            assert(address < MEM_SIZE)
             memory[address] <= data_in;
     
     // For memory reads which could be connected using combinational logic
     assign data_out = mem_read ? memory[address] : 32'b0;
 endmodule
-            
+
+// Arithmetic Logic Unit
+// Description: Performs arithmetic operations of two inputs by doing bit manipulation and addition.
+//              flag writes are based on the output of the ALU
+/* Operations:
+    - 000: Add
+    - 001: Sub
+    - 010: And
+    - 011: Or
+*/
+// May 27, 2026
+module alu (
+    input logic global_clock,
+    input logic ALU_enable, // Ready to calculate
+    input logic flag_write,
+    input logic [2:0] ALU_op, // Command code for type of operation
+    input logic [31:0] ALU_A,
+    input logic [31:0] ALU_B,
+    output logic [31:0] ALU_out,
+    output logic neg, // flag write outputs
+    output logic zero
+);
+    logic [31:0] output;
+
+    // Enumeration of op codes for readability: Maximum of 16 op codes
+    typedef enum logic [2:0] {ADD, SUB, AND, OR} op_code;
+    assign op_code code = ALU_op;
+
+    always_ff @(global_clock)
+        // If we are ready to calculate 
+        if (ALU_enable)
+            begin
+            // Check for each output
+            if (code == ADD)
+                output <= ALU_A + ALU_B;
+            else if (code == SUB)
+                output <= ALU_A - ALU_B;
+            else if (code == AND)
+                output <= ALU_A & ALU_B;
+            else if (code == OR)
+                output <= ALU_A | ALU_B;
+            end
+
+    // Connect the flag writes using combinational logic
+    assign neg = flag_write ? (output < 32'b0 ? 1'b1 : 1'b0) : 1'b0;
+    assign zero = flag_write ? (output == 32'b0 ? 1'b1 : 1'b0): 1'b0;
+
+    assign ALU_out = output;
+endmodule
