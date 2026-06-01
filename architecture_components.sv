@@ -23,6 +23,12 @@ Architecture:
     - 32 registers
     - Memory is word addressable and has 1024 slots
 
+Decoding:
+    - [6:0] op code
+    - [11:7] destination register
+    - [19:15] first source register
+    - [24:20] second source register
+
 */
 
 
@@ -123,37 +129,38 @@ module alu (
     input logic global_clock,
     input logic ALU_enable, // Ready to calculate
     input logic flag_write,
-    input logic [2:0] ALU_op, // Command code for type of operation
+    input logic [6:0] ALU_op, // Command code for type of operation
     input logic [31:0] ALU_A,
     input logic [31:0] ALU_B,
     output logic [31:0] ALU_out,
     output logic neg, // flag write outputs
     output logic zero
 );
-    logic [31:0] output;
+    logic [31:0] out;
 
     // Enumeration of op codes for readability: Maximum of 16 op codes
-    typedef enum logic [2:0] {ADD, SUB, AND, OR} op_code;
-    assign op_code code = ALU_op;
+    typedef enum logic [6:0] {ADD, SUB, AND, OR} op_code;
+    op_code code;
+    assign code = ALU_op;
 
-    always_ff @(global_clock)
+    always_ff @(posedge global_clock)
         // If we are ready to calculate 
         if (ALU_enable)
             begin
             // Check for each output
             if (code == ADD)
-                output <= ALU_A + ALU_B;
+                out <= ALU_A + ALU_B;
             else if (code == SUB)
-                output <= ALU_A - ALU_B;
+                out <= ALU_A - ALU_B;
             else if (code == AND)
-                output <= ALU_A & ALU_B;
+                out <= ALU_A & ALU_B;
             else if (code == OR)
-                output <= ALU_A | ALU_B;
+                out <= ALU_A | ALU_B;
             end
 
     // Connect the flag writes using combinational logic
-    assign neg = flag_write ? (output < 32'b0 ? 1'b1 : 1'b0) : 1'b0;
-    assign zero = flag_write ? (output == 32'b0 ? 1'b1 : 1'b0): 1'b0;
+    assign neg = flag_write ? out[31]: 1'b0;
+    assign zero = flag_write ? (out == 32'b0 ? 1'b1 : 1'b0): 1'b0;
 
-    assign ALU_out = output;
+    assign ALU_out = out;
 endmodule
