@@ -123,6 +123,7 @@ endmodule
     - 001: Sub
     - 010: And
     - 011: Or
+    - 100: Xor
 */
 // May 27, 2026
 module alu (
@@ -138,8 +139,8 @@ module alu (
 );
     logic [31:0] out;
 
-    // Enumeration of op codes for readability: Maximum of 16 op codes
-    typedef enum logic [6:0] {ADD, SUB, AND, OR} op_code;
+    // Enumeration of op codes for readability
+    typedef enum logic [6:0] {ADD, SUB, AND, OR, XOR} op_code;
     op_code code;
     assign code = ALU_op;
 
@@ -156,6 +157,8 @@ module alu (
                 out <= ALU_A & ALU_B;
             else if (code == OR)
                 out <= ALU_A | ALU_B;
+            else if (code == XOR)
+                out <= ALU_A ^ ALU_B;
             end
 
     // Connect the flag writes using combinational logic
