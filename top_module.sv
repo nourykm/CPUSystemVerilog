@@ -31,6 +31,9 @@ module fsm (
     logic IR_load, MDR_load;
     logic [31:0] IR_out;
 
+    // For immediate latches from Control unit
+    logic [31:0] immediate_12, imm_12;
+
 
     // Latch for a memory units
     always_latch begin
@@ -46,6 +49,8 @@ module fsm (
         end
         if (IR_load) begin
             IR_out <= data_out_mem;
+            // Store into the imm latches attached to ALU_B gained from control unit
+            imm_12 <= immediate_12;
         end
     end
 
@@ -54,7 +59,7 @@ module fsm (
         case (ALU_b_en) 
             3'b000 : ALU_b = b_load;
             3'b001 : ALU_b = 32'b1;
-
+            3'b010 : ALU_b = imm_12; // Imm12 from bits [31:20] in instruction
             // NOUR: Do others later
         endcase
 
@@ -157,6 +162,7 @@ module control_unit (
     output logic addr_sel,
     output logic mdr_load,
     output logic [6:0] alu_op,
+    output logic [2:0] alu_b_enable, // For I type
     output logic done,
     // Which type of instruction is this
     output logic [1:0] instr_type
@@ -175,6 +181,8 @@ module control_unit (
     logic [11:0] immediate_12;
     logic [6:0] immediate_7;
     logic [19:0] immediate_20;
+    // For choosing immediates
+    logic [2:0] alu_b_en;
 
     // R(egister) Type: 
     //      rs1: 15-19
@@ -226,23 +234,28 @@ module control_unit (
                 instruction_type = I_type;
                 rs1 = instruction[19:15];
                 immediate_12 = instruction[31:20];
+                // Pick ALU_B_en to choose that immediate
+                alu_b_en = 3'b010;
                 // Check for which type of immediate based on funct3
                 case (funct3)
-                3'b000: // addi
-                3'b001: // subi
-                3'b100: // xori
-                3'b110: // ori
-                3'b111: //andi
+                3'b000: op_code = 7'b0; // addi
+                3'b001: op_code = 7'b1; // subi
+                3'b100: op_code = 7'b100; // xori
+                3'b110: op_code = 7'b011; // ori
+                3'b111: op_code = 7'b10;//andi
                 endcase
             end
             // S TYPE INSTRUCTION -----------------------------------
             7'b0x00011 : begin
                 instruction_type = S_type;
-                mem_read = ~op_code[5];
+                mem_read = ~op_code[5]; 
                 mem_write = op_code[5];
                 rs1 = instruction[19:15];
-                rs2 = instruction[24:20];
-                immediate_7 = instruction[31:25];
+                rd = op_code[5] ? instruction[24:20] : instruction[11:7]; // Let rd be rs2 in sw instruction
+                // NB: The offset in SW and LW is encoded differently
+                // LW: inst[31:20], SW: inst[11:7] + inst[31:25]
+                immediate_12 = op_code[5] ? {instruction[31:25], instruction[11:7]} : instruction[31:20];
+                alu_b_en = 3'b010; // To select the imm12
             end
             // U TYPE INSTRUCTION -----------------------------------
             7'b1100011 : begin
@@ -264,4 +277,5 @@ module control_unit (
     assign imm_20 = immediate_20;
 
     assign alu_op = op_code;
+    assign alu_b_enable = alu_b_en;
 endmodule
