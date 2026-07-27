@@ -53,6 +53,10 @@ module register_file (
         // If write enable is on and we are not writing in the zero register
         if (RF_write && reg_W != 0)
             registers[reg_W] <= data_w;
+
+    // TEST let reg 4 have value 1 and reg 2 have value 2
+    registers[4] = 32'd1;
+    registers[2] = 32'd2;
         
     // Connect the output of the RF based on input values
     assign data_A = registers[reg_A];
@@ -104,6 +108,8 @@ module hardware_memory (
             memory[i] = 32'b0;
     end
 
+    memory[0] = 32'b00000000001000100000000110110011; // TESTING ADD INSTRUCTION: r3 <- r4 + r2
+
     // For memory writes which must be on clock edge
     always_ff @(posedge global_clock)
         if (mem_write)
@@ -131,7 +137,6 @@ endmodule
 // May 27, 2026
 module alu (
     input logic global_clock,
-    input logic ALU_enable, // Ready to calculate
     input logic flag_write,
     input logic [6:0] ALU_op, // Command code for type of operation
     input logic [31:0] ALU_A,
@@ -149,26 +154,25 @@ module alu (
 
     always_ff @(posedge global_clock)
         // If we are ready to calculate 
-        if (ALU_enable)
-            begin
-            // Check for each output
-            if (code == ADD)
-                out <= ALU_A + ALU_B;
-            else if (code == SUB)
-                out <= ALU_A - ALU_B;
-            else if (code == AND)
-                out <= ALU_A & ALU_B;
-            else if (code == OR)
-                out <= ALU_A | ALU_B;
-            else if (code == XOR)
-                out <= ALU_A ^ ALU_B;
-            else if (code == SRA)
-                out <= ALU_A >>> ALU_B;
-            else if (code == SRL)
-                out <= ALU_A >> ALU_B;
-            else if (code == SLL)
-                out <= ALU_A << ALU_B;
-            end
+        begin
+        // Check for each output
+        if (code == ADD)
+            out <= ALU_A + ALU_B;
+        else if (code == SUB)
+            out <= ALU_A - ALU_B;
+        else if (code == AND)
+            out <= ALU_A & ALU_B;
+        else if (code == OR)
+            out <= ALU_A | ALU_B;
+        else if (code == XOR)
+            out <= ALU_A ^ ALU_B;
+        else if (code == SRA)
+            out <= ALU_A >>> ALU_B;
+        else if (code == SRL)
+            out <= ALU_A >> ALU_B;
+        else if (code == SLL)
+            out <= ALU_A << ALU_B;
+        end
 
     // Connect the flag writes using combinational logic
     assign neg = flag_write ? out[31]: 1'b0;
