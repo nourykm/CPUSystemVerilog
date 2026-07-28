@@ -90,7 +90,6 @@ module fsm (
     logic neg, zero;
 
     // Control unit for decoding stage
-    logic cu_enable = 1'b0;
     logic cu_done;
     logic [4:0] reg_A, reg_B, reg_dst;
 
@@ -141,11 +140,14 @@ module fsm (
         .data_B(data_B)
     );
 
+    logic cu_mem_read;
+    logic [2:0] cu_ALU_b_en;
+    logic [6:0] cu_ALU_op;
+
     control_unit cu (
         .instruction(IR_out),
-        .enable_start(cu_enable),
         .memory_write(mem_write), // For S type
-        .memory_read(mem_read), // For S type
+        .memory_read(cu_mem_read), // For S type
         // Outputs
         .reg_A(reg_A),
         .reg_B(reg_B),
@@ -155,14 +157,20 @@ module fsm (
         .imm_20(imm_20), // For U type
         //.addr_sel(AddrSel),
         //.mdr_load(MDR_load),
-        .alu_op(ALU_op),
-        .alu_b_enable(ALU_b_en), // For I type
+        .alu_op(cu_ALU_op),
+        .alu_b_enable(cu_ALU_b_en), // For I type
         //.done(cu_done),
         // Which type of instruction is this
         .instr_type(instruction_type)
     );
 
     assign done = instr_done;
+
+    // Based on instruction, certain signals are turned on for the sake of instruction execution uncontrolled by the CU
+    // NOUR: Should we add this in the CU instead?
+    assign mem_read = (current_state == IF) ? 1'b1: cu_mem_read;
+    assign ALU_b_en = (current_state == IF) ? 3'b001 : cu_ALU_b_en;
+    assign ALU_op = (current_state == IF) ? 7'b0 : cu_ALU_op;
 
     always_ff @ (posedge global_clock, posedge global_interrupt)
         if (global_interrupt)
@@ -177,18 +185,14 @@ module fsm (
                     instr_done <= 1'b1;
                     // Retreive instruction
                     AddrSel <= 1'b1;
-                    mem_read <= 1'b1;
                     IR_load <= 1'b1;
                     // Increment PC
                     ALU_a_en <= 1'b0;
-                    ALU_b_en <= 3'b1;
-                    ALU_op <= 7'b0;
                     PC_write <= 1'b1;
                     end
                 ID: begin current_state <= EX;
                 // NB: check for program end
                     // Decode Instruction
-                    cu_enable <= 1'b1;
                     // Register fetch
                     // NOUR: For branch instructions, we most likely have to wait here until cu_done 
                     if (instruction_type == R_type)
@@ -230,7 +234,6 @@ endmodule
 // July 13, 2026
 module control_unit (
     input logic [31:0] instruction,
-    input logic enable_start,
     output logic memory_write, // For S type
     output logic memory_read, // For S type
     output logic [4:0] reg_A,
@@ -301,7 +304,6 @@ module control_unit (
         mem_read = 1'b0;
         mem_write = 1'b0;
 
-        if (enable_start) begin
             case (op_code)
             // R TYPE INSTRUCTION -----------------------------------
             7'b0110011 : begin
@@ -359,7 +361,6 @@ module control_unit (
             end
             default: ;
             endcase
-        end
         end
 
 
