@@ -54,13 +54,16 @@ module register_file (
         if (RF_write && reg_W != 0)
             registers[reg_W] <= data_w;
 
-    // TEST let reg 4 have value 1 and reg 2 have value 2
-    registers[4] = 32'd1;
-    registers[2] = 32'd2;
-        
+    initial begin
+        // TEST let reg 4 have value 1 and reg 2 have value 2
+        registers[4] = 32'd1;
+        registers[2] = 32'd2;
+    end
+
     // Connect the output of the RF based on input values
     assign data_A = registers[reg_A];
-    assign data_B = registers[reg_B];   
+    assign data_B = registers[reg_B]; 
+    assign registers[0] = 32'b0;  
 endmodule 
 
 //Program Counter
@@ -79,8 +82,8 @@ module program_counter (
 
     always_ff @(posedge global_clock)
         if (reset)
-            address <= 32'b0; 
         // If the PC write is enabled, then change the PC address stored
+            address <= 32'b0; 
         else if (PC_write)
             address <= PC_data;
     
@@ -102,19 +105,18 @@ module hardware_memory (
     output logic [31:0] data_out // Data to be read based on address
 );
     // Initialize memory: For simplicity, have 1024 slots and memory being word addressable
-    logic [31:0] memory [MEM_SIZE - 1:0];
+    logic [31:0] memory ['MEM_SIZE - 1:0];
     initial begin
         foreach (memory[i])
             memory[i] = 32'b0;
+        memory[0] = 32'b00000000001000100000000110110011; // TESTING ADD INSTRUCTION: r3 <- r4 + r2
     end
-
-    memory[0] = 32'b00000000001000100000000110110011; // TESTING ADD INSTRUCTION: r3 <- r4 + r2
 
     // For memory writes which must be on clock edge
     always_ff @(posedge global_clock)
         if (mem_write)
             // Make sure that we are accessing within the allocated space
-            assert(address < MEM_SIZE)
+            assert(address < 'MEM_SIZE)
             memory[address] <= data_in;
     
     // For memory reads which could be connected using combinational logic
@@ -150,7 +152,7 @@ module alu (
     // Enumeration of op codes for readability
     typedef enum logic [6:0] {ADD, SUB, AND, OR, XOR, SRA, SRL, SLL} op_code;
     op_code code;
-    assign code = ALU_op;
+    assign code = op_code'(ALU_op);
 
     always_ff @(posedge global_clock)
         // If we are ready to calculate 
@@ -167,16 +169,19 @@ module alu (
         else if (code == XOR)
             out <= ALU_A ^ ALU_B;
         else if (code == SRA)
-            out <= ALU_A >>> ALU_B;
+            out <= $signed(ALU_A) >>> ALU_B;
         else if (code == SRL)
             out <= ALU_A >> ALU_B;
         else if (code == SLL)
             out <= ALU_A << ALU_B;
+        if (flag_write) begin
+            // Flag writes using combinational logic
+            neg <= out[31];
+            zero <= (out == 32'b0);
+        end
+            
         end
 
-    // Connect the flag writes using combinational logic
-    assign neg = flag_write ? out[31]: 1'b0;
-    assign zero = flag_write ? (out == 32'b0 ? 1'b1 : 1'b0): 1'b0;
 
     assign ALU_out = out;
 endmodule
