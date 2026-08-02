@@ -105,7 +105,7 @@ module hardware_memory (
     output logic [31:0] data_out // Data to be read based on address
 );
     // Initialize memory: For simplicity, have 1024 slots and memory being word addressable
-    logic [31:0] memory ['MEM_SIZE - 1:0];
+    logic [31:0] memory [`MEM_SIZE - 1:0];
     initial begin
         foreach (memory[i])
             memory[i] = 32'b0;
@@ -116,7 +116,7 @@ module hardware_memory (
     always_ff @(posedge global_clock)
         if (mem_write)
             // Make sure that we are accessing within the allocated space
-            assert(address < 'MEM_SIZE)
+            assert(address < `MEM_SIZE)
             memory[address] <= data_in;
     
     // For memory reads which could be connected using combinational logic

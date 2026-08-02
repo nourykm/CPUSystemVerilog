@@ -11,7 +11,9 @@ module fsm (
     input logic reset, // Resets the pc to address 0
     output logic done
 );
-    logic instr_done; 
+    logic instr_done;
+    assign done = instr_done; 
+
     logic [31:0] AddrSelOUT, out_address;
     logic AddrSel, PC_write;
 
@@ -53,9 +55,9 @@ module fsm (
             data_out_to_write = data_out_mem;
         end
         if (IR_load) begin
-            IR_out <= data_out_mem;
+            IR_out = data_out_mem;
             // Store into the imm latches attached to ALU_B gained from control unit
-            immediate_12 <= imm_12;
+            immediate_12 = imm_12;
         end
     end
 
@@ -64,7 +66,7 @@ module fsm (
         case (ALU_b_en) 
             3'b000 : ALU_b = b_load;
             3'b001 : ALU_b = 32'b1;
-            3'b010 : ALU_b = 32'{immediate_12}; // Imm12 from bits [31:20] in instruction
+            3'b010 : ALU_b = {{20{immediate_12[11]}}, immediate_12}; // Imm12 from bits [31:20] in instruction, sign extended
             // NOUR: Do others later
             default: ALU_b = b_load;
         endcase
@@ -76,13 +78,12 @@ module fsm (
     assign data_to_write = reg_in ? data_out_to_write : ALU_output_load;
 
 
-    logic reset_pc, mem_read, mem_write;
-    reset_pc = reset;
+    logic mem_read, mem_write;
     logic flag_write;
     logic [6:0] ALU_op;
 
     typedef enum logic [2:0] {IF, ID, EX, MEM, WB} stages;
-    stages current_state;
+    stages current_state = IF;
     // Global interrupt occurs in instances such as: CPU overheating, stopped execution
     // Move to the next stage if ready
     logic [31:0] PC_address = 32'b0;//address_start;
@@ -103,7 +104,7 @@ module fsm (
     // Connect all components to respective wires
     program_counter pc (
         .global_clock(global_clock),
-        .reset(reset_pc), // For start of program/default running of program
+        .reset(reset), // For start of program/default running of program
         .PC_write(PC_write), // For when we change PC: Incrementation or branch related things
         .PC_data(ALU_out), // The value we write into the PC
         .PC_address(out_address) // The address in memory where our instruction lies
@@ -148,15 +149,12 @@ module fsm (
         .instruction(IR_out),
         .memory_write(mem_write), // For S type
         .memory_read(cu_mem_read), // For S type
-        // Outputs
         .reg_A(reg_A),
         .reg_B(reg_B),
         .reg_dst(reg_dst),
         .imm_12(imm_12), // For I type
         .imm_7(imm_7), // For S type
         .imm_20(imm_20), // For U type
-        //.addr_sel(AddrSel),
-        //.mdr_load(MDR_load),
         .alu_op(cu_ALU_op),
         .alu_b_enable(cu_ALU_b_en), // For I type
         //.done(cu_done),
@@ -164,7 +162,6 @@ module fsm (
         .instr_type(instruction_type)
     );
 
-    assign done = instr_done;
 
     // Based on instruction, certain signals are turned on for the sake of instruction execution uncontrolled by the CU
     // NOUR: Should we add this in the CU instead?
@@ -176,13 +173,13 @@ module fsm (
         if (global_interrupt)
             instr_done <= 1'b1;
         else if (reset) begin
-            reset_pc <= 1'b0;
+            current_state <= IF;
         end
         else begin
             case (current_state)
                 // Begin the instruction fetch
                 IF: begin current_state <= ID;
-                    instr_done <= 1'b1;
+                    instr_done <= 1'b0;
                     // Retreive instruction
                     AddrSel <= 1'b1;
                     IR_load <= 1'b1;
@@ -195,9 +192,7 @@ module fsm (
                     // Decode Instruction
                     // Register fetch
                     // NOUR: For branch instructions, we most likely have to wait here until cu_done 
-                    if (instruction_type == R_type)
-                            AB_load <= 1'b1;
-                    
+                    if (instruction_type == R_type) AB_load <= 1'b1;
                     end
                 EX: begin current_state <= MEM;
                     if (instruction_type == R_type) begin
@@ -209,7 +204,7 @@ module fsm (
                 MEM: begin current_state <= WB;
                     
                     end                
-                WB: begin current_state <= IF;
+                WB: begin
                     if (instruction_type == R_type) begin
                         reg_in <= 1'b0;
                         RF_write <= 1'b1;
@@ -225,6 +220,13 @@ module fsm (
         end
 
 endmodule
+
+
+
+
+
+
+
 
 // Control Unit
 // Description: Decodes the instruction specifically in the ID stage. Might take an extra cycle 
