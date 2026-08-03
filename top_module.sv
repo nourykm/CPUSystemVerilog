@@ -40,6 +40,7 @@ module fsm (
     logic [11:0] immediate_12, imm_12;
     logic [6:0] immediate_7, imm_7;
     logic [19:0] immediate_20, imm_20;
+    logic [12:0] immediate_b, imm_b;
 
 
     // Latch for a memory units
@@ -58,6 +59,7 @@ module fsm (
             IR_out = data_out_mem;
             // Store into the imm latches attached to ALU_B gained from control unit
             immediate_12 = imm_12;
+            immediate_b = imm_b - 13'd4; // To go to the previous PC value 
         end
     end
 
@@ -65,8 +67,9 @@ module fsm (
     always_comb
         case (ALU_b_en) 
             3'b000 : ALU_b = b_load;
-            3'b001 : ALU_b = 32'b1;
+            3'b001 : ALU_b = 32'd1; // WORD ADDRESSABLE
             3'b010 : ALU_b = {{20{immediate_12[11]}}, immediate_12}; // Imm12 from bits [31:20] in instruction, sign extended
+            3'b011 : ALU_b = $signed({{19{immediate_b[12]}}, immediate_b}) >>> 2; // ImmB for the immediate branches, shifted arithmetic by 2 to make sure it is word
             // NOUR: Do others later
             default: ALU_b = b_load;
         endcase
@@ -156,6 +159,7 @@ module fsm (
         .imm_12(imm_12), // For I type
         .imm_7(imm_7), // For S type
         .imm_20(imm_20), // For U type
+        .imm_b(imm_b), // For B type
         .alu_op(cu_ALU_op),
         .alu_b_enable(cu_ALU_b_en), // For I type
         //.done(cu_done),
@@ -167,10 +171,11 @@ module fsm (
 
     // Based on instruction, certain signals are turned on for the sake of instruction execution uncontrolled by the CU
     // NOUR: Should we add this in the CU instead?
-    assign mem_read = (current_state == IF) ? 1'b1: cu_mem_read;
-    assign ALU_b_en = (current_state == IF) ? 3'b001 : cu_ALU_b_en;
-    assign ALU_op = (current_state == IF || (instruction_type == B_type && current_state == EX)) ? FSM_alu_op : cu_ALU_op;
     logic [6:0] FSM_alu_op = 7'b0;
+    logic [2:0] FSM_alu_b_en = 3'b0;
+    assign mem_read = (current_state == IF) ? 1'b1: cu_mem_read;
+    assign ALU_b_en = (current_state == IF || (instruction_type == B_type && current_state == EX)) ? FSM_alu_b_en : cu_ALU_b_en;
+    assign ALU_op = (current_state == IF || (instruction_type == B_type && current_state == EX)) ? FSM_alu_op : cu_ALU_op;
     always_ff @ (posedge global_clock, posedge global_interrupt)
         if (global_interrupt)
             current_state <= PAUSE;
@@ -183,22 +188,24 @@ module fsm (
         
     always_comb begin
         // Default conditions for all logic gates changed here
-        next_state   = current_state;
-        PC_write     = 1'b0;
-        IR_load      = 1'b0;
-        MDR_load     = 1'b0;
-        AB_load      = 1'b0;
+        next_state = current_state;
+        PC_write = 1'b0;
+        IR_load = 1'b0;
+        MDR_load = 1'b0;
+        AB_load = 1'b0;
         ALU_out_load = 1'b0;
-        RF_write     = 1'b0;
-        flag_write   = 1'b0;
-        instr_done   = 1'b0;
-        reg_in       = 1'b0;
-        AddrSel      = 1'b1;
-        ALU_a_en     = 1'b1;
+        FSM_alu_op = 7'b0;
+        FSM_alu_b_en = 3'b0;
+        RF_write = 1'b0;
+        flag_write = 1'b0;
+        instr_done = 1'b0;
+        reg_in = 1'b0;
+        AddrSel = 1'b1;
+        ALU_a_en = 1'b1;
 
         case (current_state)
             // Begin the instruction fetch
-            IF: begin next_state <= ID;
+            IF: begin next_state = ID;
                 instr_done = 1'b0;
                 FSM_alu_op = 7'b0;
                 // Retreive instruction
@@ -206,18 +213,19 @@ module fsm (
                 IR_load = 1'b1;
                 // Increment PC
                 ALU_a_en = 1'b0;
-                PC_write = 1'b1;
+                FSM_alu_b_en = 3'b1;
             end
             ID: begin next_state = EX;
             // NB: check for program end
                 // Decode Instruction
                 // Register fetch 
                 AB_load = 1'b1;
+                PC_write = 1'b1; // So it can capture the +1 computed during IF
 
             end
-            EX: begin next_state <= MEM;
+            EX: begin next_state = MEM;
                 if (instruction_type == R_type || instruction_type == I_type ) begin
-                    flag_write = 1'b1;
+                    flag_write = 1'b1; 
                     ALU_out_load = 1'b1;
                 end
                 if (instruction_type == S_type) begin
@@ -227,19 +235,12 @@ module fsm (
                         instr_done = 1'b1;
                 end
                 if (instruction_type == B_type) begin
-                    // Prepare for if true: Do PC + Imm12
-                    alu_b_en = 3'b010; // Choose immediate_12
+                    // Prepare for if true: Do PC + Imm12 - 4 (to account for PC increment)
+                    flag_write = 1'b1;
+                    FSM_alu_b_en = 3'b011; // Choose immediate_b
                     FSM_alu_op = 7'b0; // To add immediate_12 with PC
                     ALU_a_en = 1'b0;
-                    // Check Z and N flags based on funct3
-                    case (cu_funct3)
-                        3'b000: PC_write = zero ? 1'b1 : 1'b0; // bqe: if z is true
-                        3'b001: PC_write = zero ? 1'b0 : 1'b1; // bne: if z is false
-                        3'b100: PC_write = neg ? 1'b1 : 1'b0;// blt: if n is true
-                        3'b101: PC_write = (!neg | zero) ? 1'b1 : 1'b0;// bge: if z is true | n is false
-                        default: PC_write = 1'b0;
-                    endcase
-                    instr_done = 1'b1;
+                    next_state = WB;
                 end
             end  
             MEM: begin next_state = WB;
@@ -256,11 +257,22 @@ module fsm (
                     RF_write = 1'b1;
                     instr_done = 1'b1;
                 end
+                if (instruction_type == B_type) begin
+                    // Check Z and N flags based on funct3
+                    case (cu_funct3)
+                        3'b000: PC_write = zero; // bqe: if z is true
+                        3'b001: PC_write = ~zero; // bne: if z is false
+                        3'b100: PC_write = neg;// blt: if n is true
+                        3'b101: PC_write = (~neg|zero);// bge: if z is true | n is false
+                        default: PC_write = 1'b0;
+                    endcase
+                    instr_done = 1'b1;
+                end
             end   
 
             PAUSE: next_state = PAUSE;
             
-            default: current_state = IF;
+            default: next_state = IF;
 
         endcase
     end
@@ -290,6 +302,7 @@ module control_unit (
     output logic [11:0] imm_12, // For I type
     output logic [6:0] imm_7, // For S type
     output logic [19:0] imm_20, // For U type
+    output logic [12:0] imm_b, // For branches
     output logic [6:0] alu_op,
     output logic [2:0] alu_b_enable, // For I type
     // Which type of instruction is this
@@ -311,6 +324,8 @@ module control_unit (
     logic [11:0] immediate_12;
     logic [6:0] immediate_7;
     logic [19:0] immediate_20;
+    logic [12:0] immediate_b;
+    assign immediate_b = {instruction[31], instruction[7], instruction[30:25], instruction[11:8], 1'b0};
     // For choosing immediates
     logic [2:0] alu_b_en;
 
@@ -408,7 +423,6 @@ module control_unit (
         // B TYPE INSTRUCTION -----------------------------------
         7'b1100011 : begin
             instruction_type = B_type;
-            immediate_12 = {instruction[31], instruction[7], instruction[30:25], instruction[11:8], 1'b0};
             rs1 = instruction[19:15];
             rs2 = instruction[24:20];
             alu_op_code = 7'b1; // This will trigger the n and z flags
@@ -429,6 +443,7 @@ module control_unit (
     assign imm_7 = immediate_7;
     assign imm_20 = immediate_20;
     assign function_3 = funct3;
+    assign imm_b = immediate_b;
 
     assign alu_op = alu_op_code;
     assign alu_b_enable = alu_b_en;

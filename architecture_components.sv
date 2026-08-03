@@ -51,7 +51,7 @@ module register_file (
 
     always_ff @(posedge global_clock)
         // If write enable is on and we are not writing in the zero register
-        if (RF_write && reg_W != 0)
+        if (RF_write)
             registers[reg_W] <= data_w;
 
     initial begin
@@ -61,9 +61,8 @@ module register_file (
     end
 
     // Connect the output of the RF based on input values
-    assign data_A = registers[reg_A];
-    assign data_B = registers[reg_B]; 
-    assign registers[0] = 32'b0;  
+    assign data_A = (reg_A == 5'b0) ? 32'b0 : registers[reg_A];
+    assign data_B = (reg_B == 5'b0) ? 32'b0 : registers[reg_B];  
 endmodule 
 
 //Program Counter
@@ -116,7 +115,7 @@ module hardware_memory (
     always_ff @(posedge global_clock)
         if (mem_write)
             // Make sure that we are accessing within the allocated space
-            assert(address < `MEM_SIZE)
+            assert(address < `MEM_SIZE) else $display("address is beyond MEM_SIZE"); 
             memory[address] <= data_in;
     
     // For memory reads which could be connected using combinational logic
