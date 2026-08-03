@@ -17,13 +17,13 @@ module fsm (
     logic [31:0] AddrSelOUT, out_address;
     logic AddrSel, PC_write;
 
-    // AddrSel MUX
-    assign AddrSelOUT = AddrSel ? out_address : b_load;
-
     // RF to ALU MUX's
     logic [31:0] data_A, data_B, a_load, b_load, ALU_b, ALU_a, ALU_out, ALU_output_load, data_out_mem, data_out_to_write;
     // a_load and b_load is what comes out of the latches between RF and muxes
     logic AB_load, ALU_a_load, ALU_out_load;
+
+    // AddrSel MUX
+    assign AddrSelOUT = AddrSel ? out_address : b_load;
 
     logic ALU_a_en;
     logic [2:0] ALU_b_en;
@@ -143,7 +143,7 @@ module fsm (
     );
 
     logic cu_mem_read;
-    logic [2:0] cu_ALU_b_en;
+    logic [2:0] cu_ALU_b_en, cu_funct3;
     logic [6:0] cu_ALU_op;
 
     control_unit cu (
@@ -160,7 +160,8 @@ module fsm (
         .alu_b_enable(cu_ALU_b_en), // For I type
         //.done(cu_done),
         // Which type of instruction is this
-        .instr_type(instruction_type)
+        .instr_type(instruction_type),
+        .function_3(cu_funct3)
     );
 
 
@@ -168,8 +169,8 @@ module fsm (
     // NOUR: Should we add this in the CU instead?
     assign mem_read = (current_state == IF) ? 1'b1: cu_mem_read;
     assign ALU_b_en = (current_state == IF) ? 3'b001 : cu_ALU_b_en;
-    assign ALU_op = (current_state == IF) ? 7'b0 : cu_ALU_op;
-
+    assign ALU_op = (current_state == IF || (instruction_type == B_type && current_state == EX)) ? FSM_alu_op : cu_ALU_op;
+    logic [6:0] FSM_alu_op = 7'b0;
     always_ff @ (posedge global_clock, posedge global_interrupt)
         if (global_interrupt)
             current_state <= PAUSE;
@@ -182,42 +183,66 @@ module fsm (
         
     always_comb begin
         // Default conditions for all logic gates changed here
+        next_state   = current_state;
+        PC_write     = 1'b0;
+        IR_load      = 1'b0;
+        MDR_load     = 1'b0;
+        AB_load      = 1'b0;
+        ALU_out_load = 1'b0;
+        RF_write     = 1'b0;
+        flag_write   = 1'b0;
+        instr_done   = 1'b0;
+        reg_in       = 1'b0;
+        AddrSel      = 1'b1;
+        ALU_a_en     = 1'b1;
 
         case (current_state)
             // Begin the instruction fetch
             IF: begin next_state <= ID;
-                instr_done <= 1'b0;
+                instr_done = 1'b0;
+                FSM_alu_op = 7'b0;
                 // Retreive instruction
-                AddrSel <= 1'b1;
-                IR_load <= 1'b1;
+                AddrSel = 1'b1;
+                IR_load = 1'b1;
                 // Increment PC
-                ALU_a_en <= 1'b0;
-                PC_write <= 1'b1;
+                ALU_a_en = 1'b0;
+                PC_write = 1'b1;
             end
-            ID: begin next_state <= EX;
+            ID: begin next_state = EX;
             // NB: check for program end
                 // Decode Instruction
-                // Register fetch
-                // NOUR: For branch instructions, we most likely have to wait here until cu_done 
-                AB_load <= 1'b1;
+                // Register fetch 
+                AB_load = 1'b1;
 
             end
             EX: begin next_state <= MEM;
                 if (instruction_type == R_type || instruction_type == I_type ) begin
-                    flag_write <= 1'b1;
-                    ALU_out_load <= 1'b1;
+                    flag_write = 1'b1;
+                    ALU_out_load = 1'b1;
                 end
                 if (instruction_type == S_type) begin
-                    MDR_load <= 1'b1;
-                    AddrSel <= 1'b0;
+                    MDR_load = 1'b1;
+                    AddrSel = 1'b0;
                     if (IR_out[5]) // if store, we are done
-                        instr_done <= 1'b1;
+                        instr_done = 1'b1;
                 end
-                if (instruction_type == B_type)
-
-                
+                if (instruction_type == B_type) begin
+                    // Prepare for if true: Do PC + Imm12
+                    alu_b_en = 3'b010; // Choose immediate_12
+                    FSM_alu_op = 7'b0; // To add immediate_12 with PC
+                    ALU_a_en = 1'b0;
+                    // Check Z and N flags based on funct3
+                    case (cu_funct3)
+                        3'b000: PC_write = zero ? 1'b1 : 1'b0; // bqe: if z is true
+                        3'b001: PC_write = zero ? 1'b0 : 1'b1; // bne: if z is false
+                        3'b100: PC_write = neg ? 1'b1 : 1'b0;// blt: if n is true
+                        3'b101: PC_write = (!neg | zero) ? 1'b1 : 1'b0;// bge: if z is true | n is false
+                        default: PC_write = 1'b0;
+                    endcase
+                    instr_done = 1'b1;
+                end
             end  
-            MEM: begin next_state <= WB;
+            MEM: begin next_state = WB;
                 if (instruction_type == S_type) begin
                     if (IR_out[5]) begin
                         // If store
@@ -225,17 +250,17 @@ module fsm (
                     end
                 end
             end                
-            WB: begin next_state <= IF;
+            WB: begin next_state = IF;
                 if (instruction_type == R_type || instruction_type == I_type) begin
-                    reg_in <= 1'b0;
-                    RF_write <= 1'b1;
-                    instr_done <= 1'b1;
+                    reg_in = 1'b0;
+                    RF_write = 1'b1;
+                    instr_done = 1'b1;
                 end
             end   
 
-            PAUSE: next_state <= PAUSE;
+            PAUSE: next_state = PAUSE;
             
-            default: current_state <= IF;
+            default: current_state = IF;
 
         endcase
     end
@@ -268,7 +293,8 @@ module control_unit (
     output logic [6:0] alu_op,
     output logic [2:0] alu_b_enable, // For I type
     // Which type of instruction is this
-    output logic [1:0] instr_type
+    output logic [1:0] instr_type,
+    output logic [2:0] function_3
 );
 
     // Encoding scheme
@@ -299,14 +325,17 @@ module control_unit (
     //      OP CODE: 0010011
     // S(tore) & Load Type
     //      rd is imm5 
-    //      rs1: 15-19
+    //      rs1: 19-15
     //      rs2: 24-20
-    //      imm7: 25-31
+    //      imm7: 31-25
     //      OP CODE: STORE 0100011
     //               LOAD 0000011
 
     // B(RANCH) Type
-    //      imm20: 31-12
+    //      imm12: instr[31], instr[7], instr[30:25], instr[11:8], 1'b0
+    //      rs1: 19-15
+    //      rs2: 24-20
+    //      funct3: 0 (beq), 1 (bne), 100 (blt), 101 (bge) 
     //      OP CODE: 1100011
 
     typedef enum logic [1:0] {R_type, I_type, S_type, B_type} inst_type;
@@ -327,65 +356,66 @@ module control_unit (
         mem_read = 1'b0;
         mem_write = 1'b0;
 
-            case (op_code)
-            // R TYPE INSTRUCTION -----------------------------------
-            7'b0110011 : begin
-                instruction_type = R_type;
-                rs1 = instruction[19:15];
-                rs2 = instruction[24:20];
-                immediate_7 = instruction[31:25]; // Instead of funct7 because lazy
-                alu_b_en = 3'b0;
-                // Decode operation
-                case (funct3)
-                3'b000: alu_op_code = immediate_7[5] ? 7'b1 : 7'b0; // If 5th bit is 1, subtract. Add if 0.
-                3'b001: alu_op_code = 7'b111;// sll
-                3'b100: alu_op_code = 7'b100; // XOR
-                3'b101: alu_op_code = immediate_7[5] ? 7'b101 : 7'b110; // If 5th bit is 1, SRA. SRL if 0.
-                3'b110: alu_op_code = 7'b11; // OR
-                3'b111: alu_op_code = 7'b10; // AND
-                default: alu_op_code = 7'b0;
-                endcase
+        case (op_code)
+        // R TYPE INSTRUCTION -----------------------------------
+        7'b0110011 : begin
+            instruction_type = R_type;
+            rs1 = instruction[19:15];
+            rs2 = instruction[24:20];
+            immediate_7 = instruction[31:25]; // Instead of funct7 because lazy
+            alu_b_en = 3'b0;
+            // Decode operation
+            case (funct3)
+            3'b000: alu_op_code = immediate_7[5] ? 7'b1 : 7'b0; // If 5th bit is 1, subtract. Add if 0.
+            3'b001: alu_op_code = 7'b111;// sll
+            3'b100: alu_op_code = 7'b100; // XOR
+            3'b101: alu_op_code = immediate_7[5] ? 7'b101 : 7'b110; // If 5th bit is 1, SRA. SRL if 0.
+            3'b110: alu_op_code = 7'b11; // OR
+            3'b111: alu_op_code = 7'b10; // AND
+            default: alu_op_code = 7'b0;
+            endcase
 
-            end
-            // I TYPE INSTRUCTION -----------------------------------
-            7'b0010011 : begin
-                instruction_type = I_type;
-                rs1 = instruction[19:15];
-                immediate_12 = instruction[31:20];
-                // Pick ALU_B_en to choose that immediate
-                alu_b_en = 3'b010;
-                // Check for which type of immediate based on funct3
-                case (funct3)
-                    3'b000: alu_op_code = 7'b0; // addi
-                    3'b001: alu_op_code = 7'b111; // shift left immediate
-                    3'b010: alu_op_code = 7'b1; // subi SOMETHING UNIQUE I DID
-                    3'b100: alu_op_code = 7'b100; // xori
-                    3'b110: alu_op_code = 7'b011; // ori
-                    3'b111: alu_op_code = 7'b10;//andi
-                endcase
-            end
-            // S TYPE INSTRUCTION -----------------------------------
-            7'b0000011, 7'b0100011 : begin
-                instruction_type = S_type;
-                mem_read = ~op_code[5]; 
-                mem_write = op_code[5];
-                rs1 = instruction[19:15];
-                rs2 = instruction[24:20];
-                // NB: The offset in SW and LW is encoded differently
-                // LW: inst[31:20], SW: inst[11:7] + inst[31:25]
-                immediate_12 = op_code[5] ? {instruction[31:25], instruction[11:7]} : instruction[31:20];
-                alu_b_en = 3'b010; // To select the imm12
-            end
-            // B TYPE INSTRUCTION -----------------------------------
-            7'b1100011 : begin
-                instruction_type = B_type;
-                immediate_20 = instruction[31:12];
-                // If op_code[6], then it is a branch instruction
-                // NOUR do later
-            end
-            default: ;
+        end
+        // I TYPE INSTRUCTION -----------------------------------
+        7'b0010011 : begin
+            instruction_type = I_type;
+            rs1 = instruction[19:15];
+            immediate_12 = instruction[31:20];
+            // Pick ALU_B_en to choose that immediate
+            alu_b_en = 3'b010;
+            // Check for which type of immediate based on funct3
+            case (funct3)
+                3'b000: alu_op_code = 7'b0; // addi
+                3'b001: alu_op_code = 7'b111; // shift left immediate
+                3'b010: alu_op_code = 7'b1; // subi SOMETHING UNIQUE I DID
+                3'b100: alu_op_code = 7'b100; // xori
+                3'b110: alu_op_code = 7'b011; // ori
+                3'b111: alu_op_code = 7'b10;//andi
             endcase
         end
+        // S TYPE INSTRUCTION -----------------------------------
+        7'b0000011, 7'b0100011 : begin
+            instruction_type = S_type;
+            mem_read = ~op_code[5]; 
+            mem_write = op_code[5];
+            rs1 = instruction[19:15];
+            rs2 = instruction[24:20];
+            // NB: The offset in SW and LW is encoded differently
+            // LW: inst[31:20], SW: inst[11:7] + inst[31:25]
+            immediate_12 = op_code[5] ? {instruction[31:25], instruction[11:7]} : instruction[31:20];
+            alu_b_en = 3'b010; // To select the imm12
+        end
+        // B TYPE INSTRUCTION -----------------------------------
+        7'b1100011 : begin
+            instruction_type = B_type;
+            immediate_12 = {instruction[31], instruction[7], instruction[30:25], instruction[11:8], 1'b0};
+            rs1 = instruction[19:15];
+            rs2 = instruction[24:20];
+            alu_op_code = 7'b1; // This will trigger the n and z flags
+        end
+        default: ;
+        endcase
+    end
 
 
     // Connect logic to output
@@ -398,6 +428,7 @@ module control_unit (
     assign imm_12 = immediate_12;
     assign imm_7 = immediate_7;
     assign imm_20 = immediate_20;
+    assign function_3 = funct3;
 
     assign alu_op = alu_op_code;
     assign alu_b_enable = alu_b_en;
