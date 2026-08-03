@@ -82,8 +82,9 @@ module fsm (
     logic flag_write;
     logic [6:0] ALU_op;
 
-    typedef enum logic [2:0] {IF, ID, EX, MEM, WB} stages;
+    typedef enum logic [2:0] {IF, ID, EX, MEM, WB, PAUSE} stages;
     stages current_state = IF;
+    stages next_state = ID;
     // Global interrupt occurs in instances such as: CPU overheating, stopped execution
     // Move to the next stage if ready
     logic [31:0] PC_address = 32'b0;//address_start;
@@ -171,53 +172,73 @@ module fsm (
 
     always_ff @ (posedge global_clock, posedge global_interrupt)
         if (global_interrupt)
-            instr_done <= 1'b1;
+            current_state <= PAUSE;
         else if (reset) begin
             current_state <= IF;
         end
         else begin
-            case (current_state)
-                // Begin the instruction fetch
-                IF: begin current_state <= ID;
-                    instr_done <= 1'b0;
-                    // Retreive instruction
-                    AddrSel <= 1'b1;
-                    IR_load <= 1'b1;
-                    // Increment PC
-                    ALU_a_en <= 1'b0;
-                    PC_write <= 1'b1;
-                    end
-                ID: begin current_state <= EX;
-                // NB: check for program end
-                    // Decode Instruction
-                    // Register fetch
-                    // NOUR: For branch instructions, we most likely have to wait here until cu_done 
-                    if (instruction_type == R_type) AB_load <= 1'b1;
-                    end
-                EX: begin current_state <= MEM;
-                    if (instruction_type == R_type) begin
-                        flag_write <= 1'b1;
-                        ALU_out_load <= 1'b1;
-                    end
-                    
-                    end  
-                MEM: begin current_state <= WB;
-                    
-                    end                
-                WB: begin
-                    if (instruction_type == R_type) begin
-                        reg_in <= 1'b0;
-                        RF_write <= 1'b1;
-                        instr_done <= 1'b1;
-                    end
-
-                    
-                    end    
-                
-                default: current_state <= IF;
-
-            endcase
+            current_state <= next_state;
         end
+        
+    always_comb begin
+        // Default conditions for all logic gates changed here
+
+        case (current_state)
+            // Begin the instruction fetch
+            IF: begin next_state <= ID;
+                instr_done <= 1'b0;
+                // Retreive instruction
+                AddrSel <= 1'b1;
+                IR_load <= 1'b1;
+                // Increment PC
+                ALU_a_en <= 1'b0;
+                PC_write <= 1'b1;
+            end
+            ID: begin next_state <= EX;
+            // NB: check for program end
+                // Decode Instruction
+                // Register fetch
+                // NOUR: For branch instructions, we most likely have to wait here until cu_done 
+                AB_load <= 1'b1;
+
+            end
+            EX: begin next_state <= MEM;
+                if (instruction_type == R_type || instruction_type == I_type ) begin
+                    flag_write <= 1'b1;
+                    ALU_out_load <= 1'b1;
+                end
+                if (instruction_type == S_type) begin
+                    MDR_load <= 1'b1;
+                    AddrSel <= 1'b0;
+                    if (IR_out[5]) // if store, we are done
+                        instr_done <= 1'b1;
+                end
+                if (instruction_type == B_type)
+
+                
+            end  
+            MEM: begin next_state <= WB;
+                if (instruction_type == S_type) begin
+                    if (IR_out[5]) begin
+                        // If store
+
+                    end
+                end
+            end                
+            WB: begin next_state <= IF;
+                if (instruction_type == R_type || instruction_type == I_type) begin
+                    reg_in <= 1'b0;
+                    RF_write <= 1'b1;
+                    instr_done <= 1'b1;
+                end
+            end   
+
+            PAUSE: next_state <= PAUSE;
+            
+            default: current_state <= IF;
+
+        endcase
+    end
 
 endmodule
 
@@ -231,7 +252,7 @@ endmodule
 // Control Unit
 // Description: Decodes the instruction specifically in the ID stage. Might take an extra cycle 
 //              in here to do memory-related operations. Outputs registers we might use.
-// https://docs.riscv.org/reference/isa/v20260120/unpriv/rv32.html
+// https://msyksphinz-self.github.io/riscv-isadoc/html/rvi.html
 // https://medium.com/@s.ruban2000/decoding-the-decoder-f60ecb4248c0
 // July 13, 2026
 module control_unit (
@@ -313,6 +334,7 @@ module control_unit (
                 rs1 = instruction[19:15];
                 rs2 = instruction[24:20];
                 immediate_7 = instruction[31:25]; // Instead of funct7 because lazy
+                alu_b_en = 3'b0;
                 // Decode operation
                 case (funct3)
                 3'b000: alu_op_code = immediate_7[5] ? 7'b1 : 7'b0; // If 5th bit is 1, subtract. Add if 0.
@@ -334,12 +356,12 @@ module control_unit (
                 alu_b_en = 3'b010;
                 // Check for which type of immediate based on funct3
                 case (funct3)
-                3'b000: alu_op_code = 7'b0; // addi
-                3'b001: alu_op_code = 7'b111; // shift left immediate
-                3'b010: alu_op_code = 7'b1; // subi SOMETHING UNIQUE I DID
-                3'b100: alu_op_code = 7'b100; // xori
-                3'b110: alu_op_code = 7'b011; // ori
-                3'b111: alu_op_code = 7'b10;//andi
+                    3'b000: alu_op_code = 7'b0; // addi
+                    3'b001: alu_op_code = 7'b111; // shift left immediate
+                    3'b010: alu_op_code = 7'b1; // subi SOMETHING UNIQUE I DID
+                    3'b100: alu_op_code = 7'b100; // xori
+                    3'b110: alu_op_code = 7'b011; // ori
+                    3'b111: alu_op_code = 7'b10;//andi
                 endcase
             end
             // S TYPE INSTRUCTION -----------------------------------
