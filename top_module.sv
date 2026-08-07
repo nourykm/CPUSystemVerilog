@@ -1,7 +1,7 @@
 
 
 // Finite-State Machine
-// Description: Decodes the instruction and calls upon modules accordingly. Uses five stage pipeline. 
+// Description: Decodes the instruction and calls upon modules accordingly. Uses multiple cycles. 
 //              NOT the top module.
 // May 28, 2026
 module fsm ( 
@@ -11,6 +11,7 @@ module fsm (
     input logic reset, // Resets the pc to address 0
     output logic done
 );
+    // Made for when program is finished
     logic instr_done;
     assign done = instr_done; 
 
@@ -19,15 +20,17 @@ module fsm (
 
     // RF to ALU MUX's
     logic [31:0] data_A, data_B, a_load, b_load, ALU_b, ALU_a, ALU_out, ALU_output_load, data_out_mem, data_out_to_write;
-    // a_load and b_load is what comes out of the latches between RF and muxes
-    logic AB_load, ALU_a_load, ALU_out_load;
+    // a_load and b_load is what comes out of the flipflops between RF and muxes
+    logic AB_load, ALU_out_load;
 
     // AddrSel MUX
-    assign AddrSelOUT = AddrSel ? out_address : b_load;
+    // Either from the PC for IF, or out of the ALU to read/write into memory
+    assign AddrSelOUT = AddrSel ? out_address : ALU_output_load;
 
     logic ALU_a_en;
     logic [2:0] ALU_b_en;
 
+    // Connect ALU_a to be either coming from rs1 or the PC address (to increment for next instruction)
     assign ALU_a = ALU_a_en ? a_load : out_address;
 
     // INBETWEEN MEMORY AND REGISTER FILE
@@ -35,42 +38,20 @@ module fsm (
     logic [31:0] IR_out;
 
 
+    // For Control unit
+    logic [11:0] imm_12;
+    logic [6:0] imm_7;
+    logic [19:0] imm_20;
+    logic [12:0] imm_b;
 
-    // For immediate latches from Control unit
-    logic [11:0] immediate_12, imm_12;
-    logic [6:0] immediate_7, imm_7;
-    logic [19:0] immediate_20, imm_20;
-    logic [12:0] immediate_b, imm_b;
-
-
-    // Latch for a memory units
-    always_latch begin
-        if (AB_load) begin
-            a_load = data_A;
-            b_load = data_B;
-        end
-        if (ALU_out_load) begin
-            ALU_output_load = ALU_out;
-        end
-        if (MDR_load) begin
-            data_out_to_write = data_out_mem;
-        end
-        if (IR_load) begin
-            IR_out = data_out_mem;
-            // Store into the imm latches attached to ALU_B gained from control unit
-            immediate_12 = imm_12;
-            immediate_b = imm_b - 13'd4; // To go to the previous PC value 
-        end
-    end
 
     // Comb. Logic for a more complicated ALU_b input
     always_comb
         case (ALU_b_en) 
             3'b000 : ALU_b = b_load;
             3'b001 : ALU_b = 32'd1; // WORD ADDRESSABLE
-            3'b010 : ALU_b = {{20{immediate_12[11]}}, immediate_12}; // Imm12 from bits [31:20] in instruction, sign extended
-            3'b011 : ALU_b = $signed({{19{immediate_b[12]}}, immediate_b}) >>> 2; // ImmB for the immediate branches, shifted arithmetic by 2 to make sure it is word
-            // NOUR: Do others later
+            3'b010 : ALU_b = {{20{imm_12[11]}}, imm_12}; // Imm12 from bits [31:20] in instruction, sign extended
+            3'b011 : ALU_b = ($signed({{19{imm_b[12]}}, imm_b}) - 32'sd4) >>> 2; // ImmB for the immediate branches, shifted arithmetic by 2 to make sure it is word
             default: ALU_b = b_load;
         endcase
 
@@ -86,19 +67,12 @@ module fsm (
     logic [6:0] ALU_op;
 
     typedef enum logic [2:0] {IF, ID, EX, MEM, WB, PAUSE} stages;
-    stages current_state = IF;
-    stages next_state = ID;
-    // Global interrupt occurs in instances such as: CPU overheating, stopped execution
-    // Move to the next stage if ready
-    logic [31:0] PC_address = 32'b0;//address_start;
-    logic [31:0] reg_fetch_A, reg_fetch_B;
+    stages current_state, next_state;
     logic neg, zero;
 
     // Control unit for decoding stage
-    logic cu_done;
     logic [4:0] reg_A, reg_B, reg_dst;
 
-        
     typedef enum logic [1:0] {R_type, I_type, S_type, B_type} inst_type;
     inst_type instruction_type;
 
@@ -119,7 +93,7 @@ module fsm (
         .mem_read(mem_read), // Enablers
         .mem_write(mem_write),
         .address(AddrSelOUT), // Address in memory to 'access'
-        .data_in(a_load), // Data to be written based on address
+        .data_in(b_load), // Data to be written based on address
         .data_out(data_out_mem) // Data to be read based on address
     );
 
@@ -162,7 +136,6 @@ module fsm (
         .imm_b(imm_b), // For B type
         .alu_op(cu_ALU_op),
         .alu_b_enable(cu_ALU_b_en), // For I type
-        //.done(cu_done),
         // Which type of instruction is this
         .instr_type(instruction_type),
         .function_3(cu_funct3)
@@ -171,21 +144,29 @@ module fsm (
 
     // Based on instruction, certain signals are turned on for the sake of instruction execution uncontrolled by the CU
     // NOUR: Should we add this in the CU instead?
-    logic [6:0] FSM_alu_op = 7'b0;
-    logic [2:0] FSM_alu_b_en = 3'b0;
+    logic [6:0] FSM_alu_op;
+    logic [2:0] FSM_alu_b_en;
     assign mem_read = (current_state == IF) ? 1'b1: cu_mem_read;
-    assign ALU_b_en = (current_state == IF || (instruction_type == B_type && current_state == EX)) ? FSM_alu_b_en : cu_ALU_b_en;
-    assign ALU_op = (current_state == IF || (instruction_type == B_type && current_state == EX)) ? FSM_alu_op : cu_ALU_op;
-    always_ff @ (posedge global_clock, posedge global_interrupt)
-        if (global_interrupt)
-            current_state <= PAUSE;
-        else if (reset) begin
-            current_state <= IF;
+    assign ALU_b_en = (current_state == IF || (instruction_type == B_type && current_state == MEM)) ? FSM_alu_b_en : cu_ALU_b_en;
+    assign ALU_op = (current_state == IF || (instruction_type == B_type && current_state == MEM)) ? FSM_alu_op : cu_ALU_op;
+    
+    // FLIPFLOPS
+    always_ff @(posedge global_clock) begin
+        if (AB_load) begin
+            a_load <= data_A;
+            b_load <= data_B;
         end
-        else begin
-            current_state <= next_state;
-        end
-        
+        if (ALU_out_load) ALU_output_load <= ALU_out;
+        if (MDR_load) data_out_to_write <= data_out_mem;
+        if (IR_load) IR_out <= data_out_mem;
+    end
+
+    // THE FSM
+    always_ff @(posedge global_clock, posedge global_interrupt) begin
+        if (global_interrupt) current_state <= PAUSE;
+        else if (reset) current_state <= IF;
+        else current_state <= next_state;
+    end
     always_comb begin
         // Default conditions for all logic gates changed here
         next_state = current_state;
@@ -222,8 +203,16 @@ module fsm (
                 AB_load = 1'b1;
                 PC_write = 1'b1; // So it can capture the +1 computed during IF
 
+                // Program end:
+                if (IR_out == 32'b0) begin
+                    next_state = PAUSE;
+                    instr_done = 1'b1;
+                end
             end
             EX: begin next_state = MEM;
+                // Retrieve reg A and B (rs1, rs2)
+            end  
+            MEM: begin next_state = WB;
                 if (instruction_type == R_type || instruction_type == I_type ) begin
                     flag_write = 1'b1; 
                     ALU_out_load = 1'b1;
@@ -240,15 +229,6 @@ module fsm (
                     FSM_alu_b_en = 3'b011; // Choose immediate_b
                     FSM_alu_op = 7'b0; // To add immediate_12 with PC
                     ALU_a_en = 1'b0;
-                    next_state = WB;
-                end
-            end  
-            MEM: begin next_state = WB;
-                if (instruction_type == S_type) begin
-                    if (IR_out[5]) begin
-                        // If store
-
-                    end
                 end
             end                
             WB: begin next_state = IF;
@@ -353,6 +333,10 @@ module control_unit (
     //      funct3: 0 (beq), 1 (bne), 100 (blt), 101 (bge) 
     //      OP CODE: 1100011
 
+
+    // I-type funct3 010 is slti in the spec, used here as subi
+    // slt/sltu/sltiu are not implemented
+
     typedef enum logic [1:0] {R_type, I_type, S_type, B_type} inst_type;
     inst_type instruction_type;
     logic mem_read, mem_write;
@@ -381,13 +365,13 @@ module control_unit (
             alu_b_en = 3'b0;
             // Decode operation
             case (funct3)
-            3'b000: alu_op_code = immediate_7[5] ? 7'b1 : 7'b0; // If 5th bit is 1, subtract. Add if 0.
-            3'b001: alu_op_code = 7'b111;// sll
-            3'b100: alu_op_code = 7'b100; // XOR
-            3'b101: alu_op_code = immediate_7[5] ? 7'b101 : 7'b110; // If 5th bit is 1, SRA. SRL if 0.
-            3'b110: alu_op_code = 7'b11; // OR
-            3'b111: alu_op_code = 7'b10; // AND
-            default: alu_op_code = 7'b0;
+                3'b000: alu_op_code = immediate_7[5] ? 7'b1 : 7'b0; // If 5th bit is 1, subtract. Add if 0.
+                3'b001: alu_op_code = 7'b111;// sll
+                3'b100: alu_op_code = 7'b100; // XOR
+                3'b101: alu_op_code = immediate_7[5] ? 7'b101 : 7'b110; // If 5th bit is 1, SRA. SRL if 0.
+                3'b110: alu_op_code = 7'b11; // OR
+                3'b111: alu_op_code = 7'b10; // AND
+                default: alu_op_code = 7'b0;
             endcase
 
         end
@@ -399,6 +383,8 @@ module control_unit (
             // Pick ALU_B_en to choose that immediate
             alu_b_en = 3'b010;
             // Check for which type of immediate based on funct3
+            immediate_7 = instruction[31:25]; // Instead of funct7 because lazy
+            if (funct3 == 3'b101) immediate_12 = {7'b0, instruction[24:20]}; // Rest is funct7
             case (funct3)
                 3'b000: alu_op_code = 7'b0; // addi
                 3'b001: alu_op_code = 7'b111; // shift left immediate
@@ -406,6 +392,8 @@ module control_unit (
                 3'b100: alu_op_code = 7'b100; // xori
                 3'b110: alu_op_code = 7'b011; // ori
                 3'b111: alu_op_code = 7'b10;//andi
+                3'b101: alu_op_code = immediate_7[5] ? 7'b101 : 7'b110; // If 5th bit is 1 srai : srli
+                default: alu_op_code = 7'b0;
             endcase
         end
         // S TYPE INSTRUCTION -----------------------------------

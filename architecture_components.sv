@@ -113,10 +113,11 @@ module hardware_memory (
 
     // For memory writes which must be on clock edge
     always_ff @(posedge global_clock)
-        if (mem_write)
+        if (mem_write) begin
             // Make sure that we are accessing within the allocated space
             assert(address < `MEM_SIZE) else $display("address is beyond MEM_SIZE"); 
             memory[address] <= data_in;
+        end
     
     // For memory reads which could be connected using combinational logic
     assign data_out = mem_read ? memory[address] : 32'b0;
