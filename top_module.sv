@@ -119,13 +119,13 @@ module fsm (
         .data_B(data_B)
     );
 
-    logic cu_mem_read;
+    logic cu_mem_read, cu_mem_write;
     logic [2:0] cu_ALU_b_en, cu_funct3;
     logic [6:0] cu_ALU_op;
 
     control_unit cu (
         .instruction(IR_out),
-        .memory_write(mem_write), // For S type
+        .memory_write(cu_mem_write), // For S type
         .memory_read(cu_mem_read), // For S type
         .reg_A(reg_A),
         .reg_B(reg_B),
@@ -149,6 +149,7 @@ module fsm (
     assign mem_read = (current_state == IF) ? 1'b1: cu_mem_read;
     assign ALU_b_en = (current_state == IF || (instruction_type == B_type && current_state == MEM)) ? FSM_alu_b_en : cu_ALU_b_en;
     assign ALU_op = (current_state == IF || (instruction_type == B_type && current_state == MEM)) ? FSM_alu_op : cu_ALU_op;
+    assign mem_write = (current_state == WB) & cu_mem_write;
     
     // FLIPFLOPS
     always_ff @(posedge global_clock) begin

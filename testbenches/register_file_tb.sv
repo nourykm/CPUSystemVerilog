@@ -122,7 +122,7 @@ module register_file_tb;
             $display("ALL TESTS PASSED");
         end
         else begin
-            $display("%d TEST(S) FAILED", errors);
+            $display("%0d TEST(S) FAILED", errors);
         end
 
 

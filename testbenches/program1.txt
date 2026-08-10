@@ -1,0 +1,21 @@
+// Add and then subtract immediate
+
+// iiiiiiiiiiii sssss 000 ddddd 0010011 for ADDI
+// iiiiiiiiiiii 00000 000 ddddd 0010011 for LI
+// 0000000_rreg2_rreg1_000_ddddd_0110011 for ADD
+// iiiiiiiiiiii_sssss_010_ddddd_0010011 for SUBI    
+
+
+
+
+000000010100_00000_000_01010_0010011 // li x10, 20
+000000000011_00000_000_01100_0010011 // li x12, 3
+0000000_01010_01100_000_01011_0110011 // add  x11, x12, x10
+000000001000_01010_010_00110_0010011 // subi x6, x10, 8
+00000000000000000000000000000000 // finish
+
+
+
+// END ANSWERS: 
+// reg[10] = 20, reg[12] = 3, reg[11] = 23, reg[6] = 12
+
