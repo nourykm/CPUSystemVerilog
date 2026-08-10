@@ -66,6 +66,11 @@ module fsm_tb;
         @(negedge global_clock);
     endtask
 
+    // For waveform simulators for macbook
+    initial begin
+        $dumpfile("cpu.vcd");
+        $dumpvars(0, hardware_memory_tb);
+    end
 
     // Begin testing
     initial begin

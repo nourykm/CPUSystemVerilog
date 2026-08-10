@@ -115,8 +115,8 @@ module hardware_memory (
     always_ff @(posedge global_clock)
         if (mem_write) begin
             // Make sure that we are accessing within the allocated space
-            assert(address < `MEM_SIZE) else $display("address is beyond MEM_SIZE"); 
-            if (address < `MEM_SIZE)
+            assert(address < `MEM_SIZE*4) else $display("address is beyond MEM_SIZE"); 
+            if (address < `MEM_SIZE*4) // *4 because address is in bytes and mem_size is in words
                 memory[address[31:2]] <= data_in;
             else
                 $display("Write to %0d is beyond MEM_SIZE, ignored", address);

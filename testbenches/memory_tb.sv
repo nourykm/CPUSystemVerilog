@@ -61,11 +61,11 @@ module hardware_memory_tb;
         #1; // This allows 1 unit in our timescale (ie 1ns) to allow the signal to settle                          
     endtask
 
-    // For waveform simulators for macbook
-    initial begin
-        $dumpfile("cpu.vcd");
-        $dumpvars(0, hardware_memory_tb);
-    end
+    // // For waveform simulators for macbook
+    // initial begin
+    //     $dumpfile("cpu.vcd");
+    //     $dumpvars(0, hardware_memory_tb);
+    // end
 
     // START THE TEST AT TIME 0
     initial begin
