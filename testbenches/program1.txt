@@ -1,4 +1,5 @@
 // Add and then subtract immediate
+// This program tests R and I type instructions
 
 // iiiiiiiiiiii sssss 000 ddddd 0010011 for ADDI
 // iiiiiiiiiiii 00000 000 ddddd 0010011 for LI

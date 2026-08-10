@@ -63,6 +63,7 @@ module fsm_tb;
 
     task finish_instruction (input int instructions);
         repeat (instructions) @(posedge done); 
+        @(negedge global_clock);
     endtask
 
 
@@ -78,16 +79,24 @@ module fsm_tb;
         // 1. Check if the preloaded instruction works
         reset_fsm();
         finish_instruction(1);
+        wait_for_pause();
         check_reg(32'd3, 5'd3);
 
         // 2. Load several instructions, wait for instructions to finish, then check answers
-        load_instructions ("program1.txt");
+        load_instructions ("testbenches/program1.txt");
         wait_for_pause();
         // reg[10] = 20, reg[12] = 3, reg[11] = 23, reg[6] = 12
         check_reg (32'd20, 5'd10);
         check_reg (32'd3, 5'd12);
         check_reg (32'd23, 5'd11);
         check_reg (32'd12, 5'd6); 
+
+        // 3. Load program 2 to test the branch instructions
+        load_instructions ("testbenches/program2.txt");
+        wait_for_pause();
+        // reg[3] = 1, reg[4] = 11
+        check_reg (32'd1, 5'd3);
+        check_reg (32'd11, 5'd4);
 
         // End simulation and display errors
 
@@ -99,7 +108,7 @@ module fsm_tb;
             $display("%0d TEST(S) FAILED", errors);
         end
 
-        $stop;  
+        $finish;  
     end
 
     initial begin

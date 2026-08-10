@@ -117,13 +117,13 @@ module hardware_memory (
             // Make sure that we are accessing within the allocated space
             assert(address < `MEM_SIZE) else $display("address is beyond MEM_SIZE"); 
             if (address < `MEM_SIZE)
-                memory[address] <= data_in;
+                memory[address[31:2]] <= data_in;
             else
                 $display("Write to %0d is beyond MEM_SIZE, ignored", address);
         end
     
     // For memory reads which could be connected using combinational logic
-    assign data_out = mem_read ? memory[address] : 32'b0;
+    assign data_out = mem_read ? memory[address[31:2]] : 32'b0; // [31:2] Makes sure that we are accessing in bytes, which is every (2^3) bits
 endmodule
 
 // Arithmetic Logic Unit

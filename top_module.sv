@@ -49,9 +49,9 @@ module fsm (
     always_comb
         case (ALU_b_en) 
             3'b000 : ALU_b = b_load;
-            3'b001 : ALU_b = 32'd1; // WORD ADDRESSABLE
+            3'b001 : ALU_b = 32'd4; // BYTE ADDRESSABLE
             3'b010 : ALU_b = {{20{imm_12[11]}}, imm_12}; // Imm12 from bits [31:20] in instruction, sign extended
-            3'b011 : ALU_b = ($signed({{19{imm_b[12]}}, imm_b}) - 32'sd4) >>> 2; // ImmB for the immediate branches, shifted arithmetic by 2 to make sure it is word
+            3'b011 : ALU_b = $signed({{19{imm_b[12]}}, imm_b}) - 32'sd4; // ImmB for the immediate branches
             default: ALU_b = b_load;
         endcase
 
