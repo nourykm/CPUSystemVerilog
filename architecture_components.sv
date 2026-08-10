@@ -116,7 +116,10 @@ module hardware_memory (
         if (mem_write) begin
             // Make sure that we are accessing within the allocated space
             assert(address < `MEM_SIZE) else $display("address is beyond MEM_SIZE"); 
-            memory[address] <= data_in;
+            if (address < `MEM_SIZE)
+                memory[address] <= data_in;
+            else
+                $display("Write to %0d is beyond MEM_SIZE, ignored", address);
         end
     
     // For memory reads which could be connected using combinational logic

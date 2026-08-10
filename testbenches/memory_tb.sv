@@ -58,9 +58,14 @@ module hardware_memory_tb;
         @(negedge global_clock);
         address = addr;
         mem_read = 1'b1;
-        #1 // This allows 1 unit in our timescale (ie 1ns) to allow the signal to settle                          
+        #1; // This allows 1 unit in our timescale (ie 1ns) to allow the signal to settle                          
     endtask
 
+    // For waveform simulators for macbook
+    initial begin
+        $dumpfile("cpu.vcd");
+        $dumpvars(0, hardware_memory_tb);
+    end
 
     // START THE TEST AT TIME 0
     initial begin
@@ -88,16 +93,16 @@ module hardware_memory_tb;
         check(32'b0, "uninitialised location reads 0");
 
         // 4. Write a value then read it back
-        do_write(32'd5, 32'hDEADBEEF, 1'b1);
+        do_write(32'd5, 32'hFEEDCAD, 1'b1);
         do_read(32'd5);
-        check(32'hDEADBEEF, "write then read addr 5");
+        check(32'hFEEDCAD, "write then read addr 5");
 
         // 5. Check address around the write: Should be 0
         do_read(32'd6);
         check(32'b0, "addr 6 untouched by write to addr 5");
 
         // 6. Check if the enabler works when writing
-        do_write(32'd7, 32'hCAFEBABE, 1'b0);
+        do_write(32'd7, 32'hCAFEFEED, 1'b0);
         do_read(32'd7);
         check(32'b0, "no write when mem_write is low");
 
@@ -122,7 +127,7 @@ module hardware_memory_tb;
             $display("%0d TEST(S) FAILED", errors);
         end
 
-        $stop;
+        $finish;
     end
 
     // TIMEOUT FOR IF TEST ISNT FINISHED BY THEN (which means something is wrong)
