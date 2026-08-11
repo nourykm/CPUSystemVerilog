@@ -25,7 +25,7 @@ module fsm (
 
     // AddrSel MUX
     // Either from the PC for IF, or out of the ALU to read/write into memory
-    assign AddrSelOUT = AddrSel ? out_address : ALU_output_load;
+    assign AddrSelOUT = AddrSel ? out_address : ALU_out;
 
     logic ALU_a_en;
     logic [2:0] ALU_b_en;
@@ -119,14 +119,11 @@ module fsm (
         .data_B(data_B)
     );
 
-    logic cu_mem_read, cu_mem_write;
     logic [2:0] cu_ALU_b_en, cu_funct3;
     logic [6:0] cu_ALU_op;
 
     control_unit cu (
         .instruction(IR_out),
-        .memory_write(cu_mem_write), // For S type
-        .memory_read(cu_mem_read), // For S type
         .reg_A(reg_A),
         .reg_B(reg_B),
         .reg_dst(reg_dst),
@@ -146,12 +143,12 @@ module fsm (
     // NOUR: Should we add this in the CU instead?
     logic [6:0] FSM_alu_op;
     logic [2:0] FSM_alu_b_en;
-    assign mem_read = (current_state == IF) ? 1'b1: cu_mem_read;
     assign ALU_b_en = (current_state == IF || (instruction_type == B_type && current_state == MEM)) ? FSM_alu_b_en : cu_ALU_b_en;
     assign ALU_op = (current_state == IF || (instruction_type == B_type && current_state == MEM)) ? FSM_alu_op : cu_ALU_op;
-    assign mem_write = (current_state == WB) & cu_mem_write;
-    
-    // FLIPFLOPS
+    assign mem_read = (current_state == IF) || (current_state == MEM && instruction_type == S_type && ~IR_out[5]);
+    assign mem_write = ((current_state == MEM) && (instruction_type == S_type)) &&  IR_out[5];
+
+    // FLIPFLOPS & ASSERTIONS
     always_ff @(posedge global_clock) begin
         if (AB_load) begin
             a_load <= data_A;
@@ -160,6 +157,9 @@ module fsm (
         if (ALU_out_load) ALU_output_load <= ALU_out;
         if (MDR_load) data_out_to_write <= data_out_mem;
         if (IR_load) IR_out <= data_out_mem;
+        // Cases where we manipulate addresses: When we are accessing hardware memory or changing PC's address
+        if ((current_state == MEM && instruction_type == S_type) || (current_state == WB && instruction_type == B_type && PC_write))
+            assert (!ALU_out[31]) else $error("Address is negative, invalid: %h.", ALU_out);
     end
 
     // THE FSM
@@ -211,7 +211,7 @@ module fsm (
                 end
             end
             EX: begin next_state = MEM;
-                // Retrieve reg A and B (rs1, rs2)
+                // Retrieve ALU A and ALU B (rs1, rs2 or immediates), computes using ALU
             end  
             MEM: begin next_state = WB;
                 if (instruction_type == R_type || instruction_type == I_type ) begin
@@ -219,9 +219,13 @@ module fsm (
                     ALU_out_load = 1'b1;
                 end
                 if (instruction_type == S_type) begin
-                    MDR_load = 1'b1;
+                    // Put address into the hardware memory and read/write
                     AddrSel = 1'b0;
-                    if (IR_out[5]) // if store, we are done
+                    // CHECK IF ADDRESS IS NEGATIVE: Reason why we didnt finish instruction for store in MEM state
+                    assert (!ALU_out[31]) else $error("Address is now negative, invalid.");
+                    if (!IR_out[5]) // otherwise, store that output into its flipflop for loading
+                        MDR_load = 1'b1;
+                    else 
                         instr_done = 1'b1;
                 end
                 if (instruction_type == B_type) begin
@@ -236,6 +240,14 @@ module fsm (
                 if (instruction_type == R_type || instruction_type == I_type) begin
                     reg_in = 1'b0;
                     RF_write = 1'b1;
+                    instr_done = 1'b1;
+                end
+                if (instruction_type == S_type) begin
+                    if (!IR_out[5]) begin
+                        // Load into the register its contents
+                        reg_in = 1'b1;
+                        RF_write = 1'b1;
+                    end
                     instr_done = 1'b1;
                 end
                 if (instruction_type == B_type) begin
@@ -275,8 +287,6 @@ endmodule
 // July 13, 2026
 module control_unit (
     input logic [31:0] instruction,
-    output logic memory_write, // For S type
-    output logic memory_read, // For S type
     output logic [4:0] reg_A,
     output logic [4:0] reg_B,
     output logic [4:0] reg_dst,
@@ -340,7 +350,6 @@ module control_unit (
 
     typedef enum logic [1:0] {R_type, I_type, S_type, B_type} inst_type;
     inst_type instruction_type;
-    logic mem_read, mem_write;
 
     always_comb 
         begin
@@ -353,8 +362,6 @@ module control_unit (
         immediate_12 = instruction[31:20];
         alu_b_en = 3'b0;
         immediate_20 = instruction[31:12];
-        mem_read = 1'b0;
-        mem_write = 1'b0;
 
         case (op_code)
         // R TYPE INSTRUCTION -----------------------------------
@@ -400,14 +407,14 @@ module control_unit (
         // S TYPE INSTRUCTION -----------------------------------
         7'b0000011, 7'b0100011 : begin
             instruction_type = S_type;
-            mem_read = ~op_code[5]; 
-            mem_write = op_code[5];
             rs1 = instruction[19:15];
             rs2 = instruction[24:20];
             // NB: The offset in SW and LW is encoded differently
             // LW: inst[31:20], SW: inst[11:7] + inst[31:25]
             immediate_12 = op_code[5] ? {instruction[31:25], instruction[11:7]} : instruction[31:20];
+            // Set up ALU to add the offset with rs1
             alu_b_en = 3'b010; // To select the imm12
+            alu_op_code = 7'b0; // Add the imm12 with whatever rs1 has
         end
         // B TYPE INSTRUCTION -----------------------------------
         7'b1100011 : begin
@@ -426,8 +433,6 @@ module control_unit (
     assign reg_A = rs1;
     assign reg_B = rs2;
     assign reg_dst = rd;
-    assign memory_read = mem_read;
-    assign memory_write = mem_write;
     assign imm_12 = immediate_12;
     assign imm_7 = immediate_7;
     assign imm_20 = immediate_20;

@@ -1,0 +1,8 @@
+// This program tests the store and load instruction type
+
+// decoding is hard to describe, just check website from cu: https://medium.com/@s.ruban2000/decoding-the-decoder-f60ecb4248c0
+000000000101_00000_000_10100_0010011 // li x20, 5
+011111010110_00000_000_10110_0010011 // li x22, 2006
+0000000_00001_00010_010_00000_0100011 // sw x1, 0(x2)
+000000000000_00010_010_00011_0000011 // lw x3, 0(x2)
+00000000000000000000000000000000 // end program
