@@ -91,9 +91,9 @@ module register_file_tb;
         do_read(5'd20, 5'd24);
         check(32'd8, 32'd10, "Register values were written and read correctly");
         
-        // 2. Check prewritten values
-        do_read(5'd4, 5'd2);
-        check(reg_4, reg_2, "Prewritten registers have their values set.");
+        // // 2. Check prewritten values
+        // do_read(5'd4, 5'd2);
+        // check(reg_4, reg_2, "Prewritten registers have their values set.");
 
         // 3. If register 0 is the zero register
         do_read(5'b0, 5'b0);

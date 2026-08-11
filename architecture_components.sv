@@ -54,12 +54,6 @@ module register_file (
         if (RF_write)
             registers[reg_W] <= data_w;
 
-    initial begin
-        // TEST let reg 4 have value 1 and reg 2 have value 2
-        registers[4] = 32'd1;
-        registers[2] = 32'd2;
-    end
-
     // Connect the output of the RF based on input values
     assign data_A = (reg_A == 5'b0) ? 32'b0 : registers[reg_A];
     assign data_B = (reg_B == 5'b0) ? 32'b0 : registers[reg_B];  
@@ -108,7 +102,6 @@ module hardware_memory (
     initial begin
         foreach (memory[i])
             memory[i] = 32'b0;
-        memory[0] = 32'b00000000001000100000000110110011; // TESTING ADD INSTRUCTION: r3 <- r4 + r2
     end
 
     // For memory writes which must be on clock edge

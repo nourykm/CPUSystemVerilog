@@ -79,8 +79,8 @@ module hardware_memory_tb;
         @(negedge global_clock);
 
         // 1. Read the address stored at 32'b0 as that is where we stored our instruction
-        do_read(32'd0);
-        check(ADD_INSTR, "read preloaded instruction at addr 0");
+        // do_read(32'd0);
+        // check(ADD_INSTR, "read preloaded instruction at addr 0");
 
         // 2. Check if reading appropriately makes data_out 32'b0
         @(negedge global_clock);
@@ -111,7 +111,7 @@ module hardware_memory_tb;
         do_read(32'd5);
         check(32'h12345678, "overwrite addr 5");
 
-        // 10. Try writing in out of bounds: Assertion should trigger
+        // 8. Try writing in out of bounds: Assertion should trigger
         $display("out of bounds, assertion message below ");
         do_write(32'd2000, 32'hFFFFFFFF, 1'b1);
 
