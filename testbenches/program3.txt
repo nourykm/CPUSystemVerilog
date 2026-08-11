@@ -1,8 +1,23 @@
 // This program tests the store and load instruction type
 
-// decoding is hard to describe, just check website from cu: https://medium.com/@s.ruban2000/decoding-the-decoder-f60ecb4248c0
+
+// iiiiiiiiiiii_sssss_010_ddddd_0000011 LOAD WORD
+// iiiiiii_sssss_rrrrr_010_iiiii_0100011 STORE WORD
+
+// Without offsets
 000000000101_00000_000_10100_0010011 // li x20, 5
-011111010110_00000_000_10110_0010011 // li x22, 2006
-0000000_00001_00010_010_00000_0100011 // sw x1, 0(x2)
-000000000000_00010_010_00011_0000011 // lw x3, 0(x2)
-00000000000000000000000000000000 // end program
+011111010110_00000_000_10110_0010011 // li x22, 2006 (word 501)
+0000000_10100_10110_010_00000_0100011 // sw x20, 0(x22)
+000000000000_10110_010_00011_0000011 // lw x3, 0(x22)
+// With offsets
+000000001001_00000_000_10101_0010011 // li x21, 9
+010111011100_00000_000_10110_0010011 // li x22, 1500
+0000000_10101_10110_010_00100_0100011 // sw x21, 4(x22) (x22 = 1500 + 4 = 1504 which is the same word as 376)
+000000000100_10110_010_00100_0000011 // lw x4, 4(x22)
+
+00000000000000000000000000000000 // end
+
+
+// END ANSWERS
+// mem[501] (nearest word to byte 2006) = 5, reg[3] = 5;
+// mem[376] (nearest word to byte 2004) = 9, reg[4] = 9;

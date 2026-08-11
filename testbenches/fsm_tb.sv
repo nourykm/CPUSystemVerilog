@@ -49,6 +49,17 @@ module fsm_tb;
         #1;
     endtask
 
+    task check_mem (input logic [31:0] address, input logic [31:0] expected);
+        // Access memory and check if the value matches
+        if (dut.memory.memory[address[31:2]] !== expected) begin // Divide the byte address by 4 to get its word address
+            $display("FAIL @%0t: mem[0x%h] = 0x%h, expected 0x%h", $time, address, dut.memory.memory[address[31:2]], expected);
+            errors++;
+        end
+        else begin
+            $display("PASS: mem[0x%0h] = 0x%0h", address, expected);
+        end
+    endtask
+
     task wait_for_pause ();
         wait (dut.current_state == dut.PAUSE);
         @(negedge global_clock);
@@ -102,6 +113,18 @@ module fsm_tb;
         // reg[3] = 1, reg[4] = 11
         check_reg (32'd1, 5'd3);
         check_reg (32'd11, 5'd4);
+
+        // 4. Load program 3 to test the store and load instructions
+        load_instructions ("testbenches/program3.txt");
+        wait_for_pause();
+        // Check for store/load word without offset:
+        // mem[501] (nearest word to byte 2006) = 5, reg[3] = 5;
+        check_mem(32'd2006, 32'd5);
+        check_reg(32'd5, 5'd3);
+        // Check for store/load word with offset:
+        // mem[501] (nearest word to byte 2004) = 9, reg[3] = 9;
+        check_mem(32'd1504, 32'd9);
+        check_reg(32'd9, 5'd4);    
 
         // End simulation and display errors
 
