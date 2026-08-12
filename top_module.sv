@@ -221,9 +221,7 @@ module fsm (
                 if (instruction_type == S_type) begin
                     // Put address into the hardware memory and read/write
                     AddrSel = 1'b0;
-                    // CHECK IF ADDRESS IS NEGATIVE: Reason why we didnt finish instruction for store in MEM state
-                    assert (!ALU_out[31]) else $error("Address is now negative, invalid.");
-                    if (!IR_out[5]) // otherwise, store that output into its flipflop for loading
+                    if (!IR_out[5])
                         MDR_load = 1'b1;
                     else 
                         instr_done = 1'b1;
