@@ -425,7 +425,7 @@ module control_unit (
 
 
     // Connect logic to output
-    assign instr_type_out = instruction_type;
+    assign inst_type_out = instruction_type;
     assign reg_A = rs1;
     assign reg_B = rs2;
     assign reg_dst = rd;

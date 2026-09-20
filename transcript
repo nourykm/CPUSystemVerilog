@@ -1,6 +1,6 @@
 vsim -gui work.fsm_tb
 # vsim -gui work.fsm_tb 
-# Start time: 15:28:42 on Sep 20,2026
+# Start time: 15:34:15 on Sep 20,2026
 # Loading sv_std.std
 # Loading work.fsm_tb
 # Loading work.top_module_sv_unit
@@ -10,14 +10,189 @@ vsim -gui work.fsm_tb
 # Loading work.alu
 # Loading work.register_file
 # Loading work.control_unit
-add wave -position insertpoint sim:/fsm_tb/*
+run -all
+# FAIL @250000: x10 = xxxxxxxx, expected 00000014
+# FAIL @250000: x12 = xxxxxxxx, expected 00000003
+# FAIL @250000: x11 = xxxxxxxx, expected 00000017
+# FAIL @250000: x6 = xxxxxxxx, expected 0000000c
+# FAIL @650000: x3 = xxxxxxxx, expected 00000001
+# FAIL @650000: x4 = xxxxxxxx, expected 0000000b
+# FAIL @1100000: mem[0x000007d6] = 0x00000000, expected 0x00000005
+# FAIL @1100000: x3 = xxxxxxxx, expected 00000005
+# FAIL @1100000: mem[0x000005e0] = 0x00000000, expected 0x00000009
+# FAIL @1100000: x4 = xxxxxxxx, expected 00000009
+# 
+# 10 TEST(S) FAILED
+# ** Note: $finish    : C:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/testbenches/fsm_tb.sv(133)
+#    Time: 1100 ns  Iteration: 1  Instance: /fsm_tb
+# 1
+# Break in Module fsm_tb at C:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/testbenches/fsm_tb.sv line 133
+pwd
+# C:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog
 run 100ns
-run 100ns
-vsim -view cpu.vcd
-# WLF Error: Bad initial WLF parcel. WLF file is corrupt.
-# Cannot open file: cpu.vcd
-vcd2wlf cpu.vcd cpu.wlf
-vsim -view cpu.wlf
-# cpu.wlf opened as dataset "cpu"
-# End time: 15:30:42 on Sep 20,2026, Elapsed time: 0:02:00
-# Errors: 0, Warnings: 1
+examine dut.memory.memory[0]
+# 00000000010100000000101000010011
+examine dut.current_state
+# PAUSE
+examine dut.instruction_type
+# xx
+examine dut.RF_write
+# 0
+examine dut.reg_dst
+# 00000
+examine dut.data_to_write
+# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+examine dut.rf.registers[10]
+# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+restart -f
+run 30ns
+# GetModuleFileName: The specified module could not be found.
+# 
+# 
+examine dut.reset
+# St0
+examine dut.pc.PC_address
+# 00000000000000000000000000000000
+examine dut.out_address
+# 00000000000000000000000000000000
+examine dut.mem_read
+# 1
+examine dut.AddrSelOUT
+# 00000000000000000000000000000000
+examine dut.IR_out
+# 00000001010000000000010100010011
+restart -f
+run 10ns
+# GetModuleFileName: The specified module could not be found.
+# 
+# 
+examine dut.current_state
+# IF
+examine dut.IR_out
+# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+examine dut.out_address
+# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+run 10ns
+examine dut.current_state
+# IF
+examine dut.IR_out
+# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+run 10ns
+examine dut.current_state
+# IF
+examine dut.instruction_type
+# xx
+run 10ns
+examine dut.current_state
+# ID
+examine dut.RF_write
+# 0
+examine dut.reg_dst
+# 01010
+examine dut.data_to_write
+# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+run 10ns
+examine dut.current_state
+# EX
+examine dut.RF_write
+# 0
+examine dut.reg_dst
+# 01010
+examine dut.data_to_write
+# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+run 10ns
+examine dut.current_state
+# MEM
+examine dut.RF_write
+# 0
+examine dut.reg_dst
+# 01010
+examine dut.data_to_write
+# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+examine dut.ALU_out
+# 00000000000000000000000000010100
+run 10ns
+examine dut.current_state
+# WB
+examine dut.rf.registers[10]
+# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+examine dut.RF_write
+# 0
+examine dut.reg_in
+# 0
+examine dut.ALU_output_load
+# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+examine dut.data_to_write
+# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+examine dut.rf.RF_write
+# St0
+examine dut.rf.reg_W
+# 01010
+examine dut.rf.data_w
+# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+restart -f
+run 40ns
+# GetModuleFileName: The specified module could not be found.
+# 
+# 
+examine dut.current_state
+# ID
+examine dut.IR_out
+# 00000001010000000000010100010011
+examine dut.instruction_type
+# xx
+examine dut.cu.instruction
+# 00000001010000000000010100010011
+run 10ns
+examine dut.current_state
+# EX
+examine dut.instruction_type
+# xx
+run 10ns
+examine dut.current_state
+# MEM
+examine dut.instruction_type
+# xx
+examine dut.cu.instruction_type
+# I_type
+examine dut.cu.inst_type_out
+# xx
+examine dut.instruction_type
+# xx
+# Compile of top_module.sv was successful.
+# Compile of architecture_components.sv was successful.
+# Compile of fsm_tb.sv was successful.
+# Compile of memory_tb.sv was successful.
+# Compile of register_file_tb.sv was successful.
+# 5 compiles, 0 failed with no errors.
+vsim -gui work.fsm_tb
+# End time: 16:15:24 on Sep 20,2026, Elapsed time: 0:41:09
+# Errors: 0, Warnings: 2
+# vsim -gui work.fsm_tb 
+# Start time: 16:15:24 on Sep 20,2026
+# Loading sv_std.std
+# Loading work.fsm_tb
+# Loading work.top_module_sv_unit
+# Loading work.fsm
+# Loading work.program_counter
+# Loading work.hardware_memory
+# Loading work.alu
+# Loading work.register_file
+# Loading work.control_unit
+run -all
+# PASS: x10 = 20
+# PASS: x12 = 3
+# PASS: x11 = 23
+# PASS: x6 = 12
+# PASS: x3 = 1
+# PASS: x4 = 11
+# PASS: mem[0x7d6] = 0x5
+# PASS: x3 = 5
+# PASS: mem[0x5e0] = 0x9
+# PASS: x4 = 9
+# 
+# ALL TESTS PASSED
+# ** Note: $finish    : C:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/testbenches/fsm_tb.sv(133)
+#    Time: 1050 ns  Iteration: 1  Instance: /fsm_tb
+# End time: 16:16:33 on Sep 20,2026, Elapsed time: 0:01:09
+# Errors: 0, Warnings: 0

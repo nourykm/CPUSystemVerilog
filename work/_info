@@ -11,7 +11,7 @@ cModel Technology
 dC:/intelFPGA/20.1
 valu
 Z0 DXx6 sv_std 3 std 0 22 VYECXdT12H8WgbUP_5Y6:3
-Z1 !s110 1789932029
+Z1 !s110 1789935315
 !i10b 1
 !s100 J_GSzj_8VjanZK9lb1<S81
 Z2 !s11b Dg1SIo80bB@j0V0VzS_@n1
@@ -22,13 +22,13 @@ Z4 dC:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog
 Z5 w1789930039
 Z6 8C:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/architecture_components.sv
 Z7 FC:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/architecture_components.sv
-!i122 34
+!i122 39
 L0 132 48
 Z8 OV;L;2020.1;71
 r1
 !s85 0
 31
-Z9 !s108 1789932029.000000
+Z9 !s108 1789935315.000000
 Z10 !s107 C:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/architecture_components.sv|
 Z11 !s90 -reportprogress|300|-work|work|-sv|-stats=none|C:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/architecture_components.sv|
 !i113 1
@@ -42,21 +42,21 @@ R3
 r1
 !s85 0
 !i10b 1
-!s100 XKj]7c;_Uk9j`VmaQ5?C71
-I1aUD4>LoTc4UPa]6G46`V0
+!s100 9EOjN;8Ak<8GfML8AB60N1
+Icci7feYca@X8L5_5ggLH@1
 Z15 !s105 top_module_sv_unit
 S1
 R4
-Z16 w1789932014
+Z16 w1789935303
 Z17 8C:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/top_module.sv
 Z18 FC:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/top_module.sv
-!i122 33
+!i122 38
 L0 285 156
 R8
 31
-Z19 !s108 1789932028.000000
-Z20 !s107 C:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/top_module.sv|
-Z21 !s90 -reportprogress|300|-work|work|-sv|-stats=none|C:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/top_module.sv|
+R9
+Z19 !s107 C:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/top_module.sv|
+Z20 !s90 -reportprogress|300|-work|work|-sv|-stats=none|C:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/top_module.sv|
 !i113 1
 R12
 R13
@@ -76,13 +76,13 @@ R4
 R16
 R17
 R18
-!i122 33
+!i122 38
 L0 7 264
 R8
 31
+R9
 R19
 R20
-R21
 !i113 1
 R12
 R13
@@ -99,7 +99,7 @@ R4
 w1789930825
 8C:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/testbenches/fsm_tb.sv
 FC:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/testbenches/fsm_tb.sv
-!i122 35
+!i122 40
 L0 5 138
 R8
 r1
@@ -124,7 +124,7 @@ R4
 R5
 R6
 R7
-!i122 34
+!i122 39
 L0 92 25
 R8
 r1
@@ -138,7 +138,7 @@ R12
 R13
 vhardware_memory_tb
 R0
-R1
+Z21 !s110 1789935316
 !i10b 1
 !s100 kBERb@O>Sc?Tg5LQaR0[_1
 R2
@@ -149,7 +149,7 @@ R4
 Z22 w1789929045
 8C:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/testbenches/memory_tb.sv
 FC:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/testbenches/memory_tb.sv
-!i122 36
+!i122 41
 L0 5 136
 R8
 r1
@@ -174,7 +174,7 @@ R4
 R5
 R6
 R7
-!i122 34
+!i122 39
 L0 66 20
 R8
 r1
@@ -199,7 +199,7 @@ R4
 R5
 R6
 R7
-!i122 34
+!i122 39
 L0 40 21
 R8
 r1
@@ -213,7 +213,7 @@ R12
 R13
 vregister_file_tb
 R0
-R1
+R21
 !i10b 1
 !s100 oO:n<Ja`1feEcGJ=<nB2N0
 R2
@@ -224,13 +224,13 @@ R4
 R22
 8C:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/testbenches/register_file_tb.sv
 FC:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/testbenches/register_file_tb.sv
-!i122 37
+!i122 42
 L0 5 135
 R8
 r1
 !s85 0
 31
-R9
+!s108 1789935316.000000
 !s107 C:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/testbenches/register_file_tb.sv|
 !s90 -reportprogress|300|-work|work|-sv|-stats=none|C:/Users/noury/OneDrive/Desktop/Projects/CPUSystemVerilog/testbenches/register_file_tb.sv|
 !i113 1
@@ -251,13 +251,13 @@ R4
 R16
 R17
 R18
-!i122 33
+!i122 38
 L0 2 0
 R8
 31
+R9
 R19
 R20
-R21
 !i113 1
 R12
 R13
