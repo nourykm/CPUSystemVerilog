@@ -1,5 +1,5 @@
 
-
+typedef enum logic [1:0] {R_type, I_type, S_type, B_type} inst_type;
 // Finite-State Machine
 // Description: Decodes the instruction and calls upon modules accordingly. Uses multiple cycles. 
 //              NOT the top module.
@@ -73,7 +73,6 @@ module fsm (
     // Control unit for decoding stage
     logic [4:0] reg_A, reg_B, reg_dst;
 
-    typedef enum logic [1:0] {R_type, I_type, S_type, B_type} inst_type;
     inst_type instruction_type;
 
     // For RF
@@ -134,7 +133,7 @@ module fsm (
         .alu_op(cu_ALU_op),
         .alu_b_enable(cu_ALU_b_en), // For I type
         // Which type of instruction is this
-        .instr_type(instruction_type),
+        .inst_type_out(instruction_type),
         .function_3(cu_funct3)
     );
 
@@ -295,7 +294,7 @@ module control_unit (
     output logic [6:0] alu_op,
     output logic [2:0] alu_b_enable, // For I type
     // Which type of instruction is this
-    output logic [1:0] instr_type,
+    output inst_type inst_type_out,
     output logic [2:0] function_3
 );
 
@@ -346,7 +345,6 @@ module control_unit (
     // I-type funct3 010 is slti in the spec, used here as subi
     // slt/sltu/sltiu are not implemented
 
-    typedef enum logic [1:0] {R_type, I_type, S_type, B_type} inst_type;
     inst_type instruction_type;
 
     always_comb 
@@ -427,7 +425,7 @@ module control_unit (
 
 
     // Connect logic to output
-    assign instr_type = instruction_type;
+    assign instr_type_out = instruction_type;
     assign reg_A = rs1;
     assign reg_B = rs2;
     assign reg_dst = rd;

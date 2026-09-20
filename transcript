@@ -1,0 +1,23 @@
+vsim -gui work.fsm_tb
+# vsim -gui work.fsm_tb 
+# Start time: 15:28:42 on Sep 20,2026
+# Loading sv_std.std
+# Loading work.fsm_tb
+# Loading work.top_module_sv_unit
+# Loading work.fsm
+# Loading work.program_counter
+# Loading work.hardware_memory
+# Loading work.alu
+# Loading work.register_file
+# Loading work.control_unit
+add wave -position insertpoint sim:/fsm_tb/*
+run 100ns
+run 100ns
+vsim -view cpu.vcd
+# WLF Error: Bad initial WLF parcel. WLF file is corrupt.
+# Cannot open file: cpu.vcd
+vcd2wlf cpu.vcd cpu.wlf
+vsim -view cpu.wlf
+# cpu.wlf opened as dataset "cpu"
+# End time: 15:30:42 on Sep 20,2026, Elapsed time: 0:02:00
+# Errors: 0, Warnings: 1
